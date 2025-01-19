@@ -1,0 +1,12 @@
+{
+    "project_name": "my_fastapi_project",
+    "package_name": "{{cookiecutter.project_name|lower|replace('-', '_')}}",
+    "author": "{{ environ.get('GIT_AUTHOR_NAME', environ.get('USER', 'Your Name')) }}",
+    "email": "{{ environ.get('GIT_AUTHOR_EMAIL', environ.get('USER_EMAIL', 'user@gmail.com')) }}",
+    "description": "A FastAPI project template",
+    "python_version": "3.11",
+    "docs": "y",
+    "coverage": "y",
+    "dockerfile": "y",
+    "pyright": "y"
+}

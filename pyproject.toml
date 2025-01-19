@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+exclude = ["templates", "templates.*"]
+
+[tool.setuptools]
+# No need to include `packages` section for a single file
+py-modules = ["pytemplate"]
+
+
+[project]
+name = "pytemplate-uv"
+version = "0.1.0"
+description = "A template for creating a python project"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "typer>=0.15.1",
+]
+
+[project.scripts]
+create-project = "pytemplate:main"
+
+# Include non-Python files (e.g., templates, static files) if needed
+[tool.setuptools.package-data]
+include = ["templates/**"]
+

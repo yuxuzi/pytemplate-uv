@@ -1,0 +1,82 @@
+[project]
+name = "{{cookiecutter.package_name}}"
+version = "0.1.0"
+description = "{{cookiecutter.description}}"
+authors = ["{{cookiecutter.author_name}}"]
+dependencies = [
+    "python-dotenv",
+    {%- if cookiecutter.cli == "y" %}
+    "click>=8.1.7",
+    "rich>=13.7.0",
+    {%- endif %}
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.1.9",
+    "pytest>=7.4.4",
+    {%- if cookiecutter.coverage == "y" %}
+    "pytest-cov>=4.1.0",
+    {%- endif %}
+    "black>=23.12.1",
+    {%- if cookiecutter.docs == "y" %}
+    "pdoc>=14.1.0",
+    {%- endif %}
+    {%- if cookiecutter.pyright == "y" %}
+    "pyright>=1.1.344",
+    {%- endif %}
+    "pre-commit>=3.6.0",
+]
+
+[tool.ruff]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort
+    "N",   # pep8-naming
+]
+ignore = []
+line-length = 88
+
+# Import sorting
+src = ["{{cookiecutter.package_name}}"]
+[tool.ruff.isort]
+known-first-party = ["{{cookiecutter.package_name}}"]
+combine-as-imports = true
+lines-after-imports = 2
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["{{cookiecutter.package_name}}", "{{cookiecutter.package_name}}.*"]
+
+{%- if cookiecutter.pyright == "y" %}
+[tool.pyright]
+include = ["{{cookiecutter.package_name}}"]
+exclude = ["**/__pycache__"]
+typeCheckingMode = "basic"
+useLibraryCodeForTypes = true
+{%- endif %}
+
+[tool.uv.scripts]
+{%- if cookiecutter.cli == "y" %}
+start = "{{cookiecutter.package_name}} --help"
+{%- endif %}
+test = "pytest tests/ --cov={{cookiecutter.package_name}} --cov-report=term-missing --cov-report=html:coverage"
+lint = "ruff check ."
+format = "ruff format ."
+{%- if cookiecutter.pyright == "y" %}
+typecheck = "pyright"
+{%- endif %}
+{%- if cookiecutter.docs == "y" %}
+docs-serve = "pdoc --http localhost:8001 {{cookiecutter.package_name}}"
+docs-build = "pdoc -o docs {{cookiecutter.package_name}}"
+{%- endif %}
+
+{%- if cookiecutter.cli == "y" %}
+[project.scripts]
+{{cookiecutter.package_name}} = "{{cookiecutter.package_name}}.cli:main"
+{%- endif %}
