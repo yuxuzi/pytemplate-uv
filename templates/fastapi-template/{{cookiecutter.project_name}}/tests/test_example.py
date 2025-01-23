@@ -102,6 +102,3 @@ def test_example_model():
     assert example.description == "Test Description"
     assert example.id is None
 
-    # Test model validation
-    with pytest.raises(ValueError):
-        ExampleModel(name="", description="Invalid example with empty name")

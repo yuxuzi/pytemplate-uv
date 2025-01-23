@@ -1,0 +1,40 @@
+# Application Configuration
+APP_NAME={{cookiecutter.project_name}}
+APP_VERSION=0.1.0
+ENVIRONMENT=development
+DEBUG=false
+
+# Server Settings
+HOST=0.0.0.0
+PORT=8000
+
+# Database Settings
+DATABASE_URL=sqlite+aiosqlite:///./my-fastapi.db
+
+# Security Settings
+SECRET_KEY=your-secret-key-here
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# API Settings
+API_V1_PREFIX=/api/v1
+DOCS_URL=/docs
+# REDOC_URL=/redoc
+OPENAPI_URL=/openapi.json
+
+# CORS Settings
+CORS_ORIGINS=["*"]
+# CORS_METHODS=["*"]
+# CORS_HEADERS=["*"]
+
+# Logging Settings
+LOG_LEVEL=INFO
+LOG_FORMAT=%(asctime)s - %(name)s - %(levelname)s - %(message)s
+# LOG_FILE=my-fastapi.log
+
+# Optional: Email Configuration
+# EMAIL_HOST=smtp.example.com
+# EMAIL_PORT=587
+# EMAIL_USER=user@example.com
+# EMAIL_PASSWORD=securepassword
+# EMAIL_USE_TLS=true
+

@@ -1,0 +1,106 @@
+[project]
+name = "{{cookiecutter.project_name}}"
+version = "0.1.0"
+description = "{{cookiecutter.description}}"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "{{cookiecutter.author}}", email = "{{cookiecutter.email}}"}
+]
+keywords = ["python", "template", "project"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "python-dotenv>=1.0.0",
+    "typer>=0.9.0",
+    "rich>=13.7.0",
+    "pydantic>=2.6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.1.9",
+    "pytest>=7.4.4",
+    "black>=23.12.1",
+    "pre-commit>=3.6.0",
+    "pre-commit-hooks>=4.5.0",
+    "mypy>=1.7.1",
+    "coverage>=7.4.0",
+]
+docs = [
+    "mkdocs>=1.5.3",
+    "mkdocstrings[python]>=0.24.0",
+    "pdoc>=0.10.0",
+]
+test = [
+    "pytest>=7.4.4",
+    "pytest-cov>=4.1.0",
+]
+
+[project.scripts]
+{{cookiecutter.package_name}} = "{{cookiecutter.package_name}}.cli:main"
+
+[build-system]
+requires = ["setuptools>=68.2.0", "wheel", "setuptools_scm[toml]>=7.1.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["{{cookiecutter.package_name}}"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "C4",  # flake8-comprehensions
+]
+ignore = ["E501"]  # Line too long (handled by black)
+
+[tool.ruff.isort]
+known-first-party = ["{{cookiecutter.package_name}}"]
+combine-as-imports = true
+lines-after-imports = 2
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+preview = true
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --cov={{cookiecutter.package_name}} --cov-report=term-missing"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
+]
+
+[tool.coverage.run]
+source = ["{{cookiecutter.package_name}}"]
+omit = ["tests/*"]
+
+[tool.pdoc]
+output_dir = "docs"
+docformat = "google"

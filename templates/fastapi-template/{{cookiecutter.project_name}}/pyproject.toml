@@ -1,0 +1,115 @@
+[project]
+name = "{{cookiecutter.package_name}}"
+version = "0.1.0"
+description = "{{cookiecutter.description}}"
+authors = [
+    {name = "{{cookiecutter.author}}", email = "{{cookiecutter.email}}"}
+]
+dependencies = [
+    "fastapi[standard]>=0.109.0",
+    "sqlmodel>=0.0.14",
+    "uvicorn>=0.27.0",
+    "python-dotenv>=1.0.0",
+    "pydantic-settings>=2.1.0",
+    "pydantic>=2.6.0",  # Ensure pydantic is included
+    "aiosqlite>=0.19.0",
+    "greenlet>=3.0.3", # Add greenlet library
+    "pre-commit>=4.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.4",
+    "pytest-asyncio>=0.21.1",
+    "pytest-cov>=4.1.0",
+    "httpx>=0.25.2",
+    "ruff>=0.1.9",
+    "black>=23.12.1",
+    "mypy>=1.7.1",
+    "pre-commit>=3.6.0",
+    "pre-commit-hooks>=4.5.0",  # Additional pre-commit hooks
+]
+docs = [
+    "mkdocs>=1.5.3",
+    "mkdocstrings[python]>=0.24.0",
+    "pdoc>=0.10.0",
+]
+test = [
+    "pytest>=7.0.0",
+    "httpx>=0.24.0"
+]
+
+[project.scripts]
+# Project management scripts
+{{cookiecutter.package_name}} = "{{cookiecutter.package_name}}.cli:app"
+
+
+
+[build-system]
+requires = ["setuptools>=68.2.0", "wheel", "setuptools_scm[toml]>=7.1.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["{{cookiecutter.package_name}}"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --cov={{cookiecutter.package_name}} --cov-report=term-missing"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
+]
+
+[tool.ruff]
+select = ["E", "F", "W"]
+ignore = []
+line-length = 88
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+strict = true  # Enable strict type checking
+disallow_untyped_defs = true  # Require type annotations for all functions
+disallow_incomplete_defs = true  # Disallow functions without all parameter types
+check_untyped_defs = true  # Type check body of functions without type annotations
+disallow_untyped_decorators = true  # Require type annotations for decorators
+no_implicit_optional = true  # Treat None as a separate type, not a default
+warn_redundant_casts = true  # Warn about redundant type casts
+warn_unused_ignores = true  # Warn about unused # type: ignore comments
+warn_no_return = true  # Warn about functions that don't return
+ignore_missing_imports = true  # Allow missing type hints for third-party libraries
+
+[[tool.mypy.overrides]]
+module = [
+    "{{cookiecutter.package_name}}.*"
+]
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = [
+    "tests.*"
+]
+# Allow untyped defs in tests for more flexibility
+disallow_untyped_defs = false
+
+[tool.pdoc]
+output_dir = "docs"
+include_undocumented = false
+docformat = "google"
+template_directory = "docs/templates"
+
+[tool.pdoc.docstring-style]
+style = "google"
+line_length = 88
+
+[tool.pdoc.render]
+show_source_code = true
+show_source_code_url = true
+use_google_search = true

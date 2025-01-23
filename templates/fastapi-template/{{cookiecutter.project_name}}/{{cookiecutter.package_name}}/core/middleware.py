@@ -36,7 +36,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             # Log response
             process_time = time.time() - start_time
             logger.info(
-                f"Request completed",
+                "Request completed",
                 extra={
                     "request_id": request_id,
                     "status_code": response.status_code,
@@ -52,7 +52,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         except Exception as e:
             process_time = time.time() - start_time
             logger.error(
-                f"Request failed",
+                "Request failed",
                 extra={
                     "request_id": request_id,
                     "error": str(e),

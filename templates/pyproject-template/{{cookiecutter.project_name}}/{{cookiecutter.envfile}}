@@ -4,10 +4,9 @@ DATABASE_URL=sqlite:///test.db  # Example for SQLite
 # DATABASE_URL=mysql+pymysql://user:password@localhost/dbname  # Example for MySQL
 
 # Debug Mode
-DEBUG=true  # Set to false in production
+DEBUG=true
 
-# Secret Key for Security (e.g., JWT signing, session management)
-SECRET_KEY=MySecretKey  # Replace with a strong, unique key for production
+
 
 # Logging Configuration
 LOG_LEVEL=debug  # Options: debug, info, warning, error, critical
@@ -18,11 +17,11 @@ APP_ENV=development  # Options: development, production, testing
 APP_VERSION=1.0.0
 
 # Email Configuration
-EMAIL_HOST=smtp.example.com
-EMAIL_PORT=587
-EMAIL_USER=user@example.com
-EMAIL_PASSWORD=securepassword
-EMAIL_USE_TLS=true
+#EMAIL_HOST=smtp.example.com
+#EMAIL_PORT=587
+#EMAIL_USER=user@example.com
+#EMAIL_PASSWORD=securepassword
+#EMAIL_USE_TLS=true
 
 # Cache Configuration
 CACHE_TYPE=redis  # Options: redis, memory, filesystem
@@ -35,9 +34,7 @@ CACHE_URL=redis://localhost:6379/0  # Example for Redis
 # TWILIO_ACCOUNT_SID=
 # TWILIO_AUTH_TOKEN=
 
-# Additional Configuration
-ENABLE_FEATURE_X=true
-ENABLE_FEATURE_Y=false
+
 
 # Paths
 DATA_DIR=./data

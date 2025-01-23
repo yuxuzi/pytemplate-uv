@@ -1,5 +1,6 @@
 from typing import List
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..core.exceptions import NotFoundError, ValidationError
 from ..db import async_session
@@ -29,9 +30,8 @@ async def list_examples(
     Returns:
         List of example items
     """
-    result = await db.execute(
-        ExampleModel.select().offset(skip).limit(limit)
-    )
+    query = select(ExampleModel).offset(skip).limit(limit)
+    result = await db.execute(query)
     return result.scalars().all()
 
 @router.get("/examples/{example_id}", response_model=ExampleModel)

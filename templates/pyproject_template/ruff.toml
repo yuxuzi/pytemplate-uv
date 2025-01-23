@@ -1,4 +1,0 @@
-[tool.ruff]
-select = ["E", "F", "W"]
-ignore = []
-line-length = 88

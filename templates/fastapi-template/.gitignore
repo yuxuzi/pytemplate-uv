@@ -38,7 +38,7 @@ Pipfile.lock
 poetry.lock
 .cache/
 
-# Pyright
+# Mypy
 pyrightconfig.json
 
 # Unit test / coverage reports

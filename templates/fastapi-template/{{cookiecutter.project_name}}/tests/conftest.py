@@ -1,7 +1,7 @@
 import asyncio
 import pytest
 from fastapi.testclient import TestClient
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel
@@ -11,6 +11,7 @@ from {{cookiecutter.package_name}}.db import async_session, init_db
 from {{cookiecutter.package_name}}.main import app
 
 settings = get_settings()
+
 
 # Use an in-memory database for testing
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -41,9 +42,14 @@ async def test_engine():
     
     await engine.dispose()
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 async def test_session(test_engine):
     """Create a test database session."""
+    # Drop all tables before creating
+    async with test_engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.drop_all)
+        await conn.run_sync(SQLModel.metadata.create_all)
+    
     async_session_maker = sessionmaker(
         test_engine,
         class_=AsyncSession,
@@ -67,7 +73,10 @@ async def client():
     
     app.dependency_overrides = {}
     
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    async with AsyncClient(
+        base_url="http://test", 
+        transport=ASGITransport(app=app)
+    ) as ac:
         yield ac
 
 @pytest.fixture

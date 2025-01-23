@@ -1,10 +1,10 @@
 {
-    "project_name": "my-fastapi-project",
+    "project_name": "my-python-project",
     "package_name": "{{cookiecutter.project_name|lower|replace('-', '_')}}",
+    "description": "A Python project template",
     "author": "{{ cookiecutter.get('author', 'Your Name') }}",
     "email": "{{ cookiecutter.get('email', 'your@email.com') }}",
-    "github_username": "{{ cookiecutter.get('github_username', 'your_username') }}",
-    "description": "A FastAPI project template",
+    "github_username": "{{ cookiecutter.get('github_username', 'your_username') }}", 
     "python_version": "3.11",
     "docs": "y",
     "coverage": "y",
@@ -12,12 +12,13 @@
     "mypy": "y",
     "license": "MIT",
     "envfile": ".env",
-    "_copy_without_render": [
-    "docs",
-    "coverage", 
-    "dockerfile", 
-    "mypy", 
-    "envfile",
-    "license"
-]
+    
+    "_skip_if_present": [
+        "docs",
+        "coverage", 
+        "dockerfile", 
+        "mypy", 
+        "envfile",
+        "license"
+    ]
 }
