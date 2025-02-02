@@ -21,19 +21,20 @@ venv-activate:
 	@echo "Activating virtual environment..."
 	@$(VENV_ACTIVATE)
 
-# Wrapper function to ensure virtual environment is activated
-define ensure_venv
-	@if [ -z "$(VIRTUAL_ENV)" ]; then \
-		echo "Activating virtual environment..."; \
-		. .venv/bin/activate; \
-	fi
-endef
-
 # Apply venv-activate as a global prerequisite
 .PHONY: all
 all: venv-activate
 
-# Modify all targets to depend on venv-activate
+# Define common commands
+PYTEST = pytest
+UV_PIP_INSTALL = uv pip install
+BLACK = black
+RUFF = ruff
+PDOC = pdoc
+BUILD = python -m build
+TWINE = twine
+
+# Targets
 .PHONY: help setup dev start run lint lint-fix format format-check test test-cov clean docs build publish
 
 help: venv-activate
@@ -68,14 +69,12 @@ help: venv-activate
 # Setup project dependencies
 setup: venv-activate
 	@echo "Installing dependencies..."
-	$(ensure_venv)
-	uv pip install -e ".[dev, docs, test]" && pre-commit install
+	$(UV_PIP_INSTALL) -e ".[dev, docs, test]" && pre-commit install
 
 # Start the application
 start: venv-activate
 	@echo "Starting application..."
-	$(ensure_venv)
-	python -m {{cookiecutter.package_name}}.cli
+	$(PYTHON) -m {{cookiecutter.package_name}}.cli
 
 # Alias for start
 run: start
@@ -83,38 +82,32 @@ run: start
 # Linting
 lint: venv-activate
 	@echo "Running linter..."
-	$(ensure_venv)
-	ruff check .
+	$(RUFF) check .
 
 # Linting with auto-fix
 lint-fix: venv-activate
 	@echo "Running linter with auto-fix..."
-	$(ensure_venv)
-	ruff check . --fix
+	$(RUFF) check . --fix
 
 # Code formatting
 format: venv-activate
 	@echo "Formatting code with Black..."
-	$(ensure_venv)
-	black .
+	$(BLACK) .
 
 # Check code formatting
 format-check: venv-activate
 	@echo "Checking code formatting..."
-	$(ensure_venv)
-	black . --check
+	$(BLACK) . --check
 
 # Run tests
 test: venv-activate
 	@echo "Running tests..."
-	$(ensure_venv)
-	pytest tests/
+	$(PYTEST) tests/
 
 # Run tests with coverage
 test-cov: venv-activate
 	@echo "Running tests with coverage..."
-	$(ensure_venv)
-	pytest --cov={{cookiecutter.package_name}} --cov-report=term-missing 
+	$(PYTEST) --cov={{cookiecutter.package_name}} --cov-report=term-missing 
 
 # Clean up virtual environment and cache files
 clean:
@@ -127,19 +120,16 @@ clean:
 # Generate documentation
 docs: venv-activate
 	@echo "Generating documentation..."
-	$(ensure_venv)
-	pdoc -o docs {{cookiecutter.package_name}}
+	$(PDOC) -o docs {{cookiecutter.package_name}}
 
 # Build distribution packages
 build: venv-activate
 	@echo "Building distribution packages..."
-	$(ensure_venv)
-	uv pip install build
-	python -m build
+	$(UV_PIP_INSTALL) build
+	$(BUILD)
 
 # Publish to PyPI
 publish: build
 	@echo "Publishing to PyPI..."
-	$(ensure_venv)
-	uv pip install twine
-	twine upload dist/*
+	$(UV_PIP_INSTALL) $(TWINE)
+	$(TWINE) upload dist/*
