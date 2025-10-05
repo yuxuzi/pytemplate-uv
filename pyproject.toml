@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pytemplate-uv"
-version = "0.1.0"
+version = "2.0.0"
 description = """PyTemplate UV: A Modern Python Project Generator
 
 A powerful CLI tool that simplifies Python project creation using the `uv` package manager. Streamline your development workflow with standardized, production-ready project templates.
