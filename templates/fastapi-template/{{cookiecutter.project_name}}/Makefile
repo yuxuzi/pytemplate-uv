@@ -69,12 +69,18 @@ help: venv-activate
 # Setup project dependencies
 setup: venv-activate
 	@echo "Installing dependencies..."
-	$(UV_PIP_INSTALL) -e ".[dev, docs, test]" && pre-commit install
+	$(UV_PIP_INSTALL) -e ".[dev, docs, test]"
+	@echo "Installing pre-commit hooks..."
+	pre-commit install
+
+# Development setup
+dev: setup
+	@echo "Development environment setup complete!"
 
 # Start the application
 start: venv-activate
 	@echo "Starting application..."
-	fastapi dev {{cookiecutter.package_name}}/main.py
+	uvicorn {{cookiecutter.package_name}}.main:app --reload --host 0.0.0.0 --port 8000
 
 # Alias for start
 run: start
@@ -107,7 +113,7 @@ test: venv-activate
 # Run tests with coverage
 test-cov: venv-activate
 	@echo "Running tests with coverage..."
-	$(PYTEST) --cov={{cookiecutter.package_name}} --cov-report=term-missing 
+	$(PYTEST) --cov={{cookiecutter.package_name}} --cov-report=term-missing tests/
 
 # Clean up virtual environment and cache files
 clean:
