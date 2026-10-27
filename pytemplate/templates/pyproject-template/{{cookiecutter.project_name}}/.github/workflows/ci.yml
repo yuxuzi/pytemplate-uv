@@ -18,4 +18,4 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: {% raw %}${{ matrix.python-version }}{% endraw %}
-      - run: uv run --extra dev pytest
+      - run: uv run --extra dev --extra test pytest

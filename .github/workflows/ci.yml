@@ -35,5 +35,5 @@ jobs:
         with:
           python-version: "3.11"
       - run: uv run --extra dev pytemplate create profile-smoke --profile ${{ matrix.profile }} --output-dir . --no-input
-      - run: uv run --extra dev pytest
+      - run: uv run --extra dev --extra test pytest
         working-directory: profile-smoke
