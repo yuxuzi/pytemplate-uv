@@ -1,0 +1,5 @@
+id = "python"
+name = "Python CLI or library"
+description = "A compact Python package with a CLI, tests, and development tooling."
+version = "1"
+aliases = ["pyproject"]

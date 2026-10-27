@@ -1,25 +1,14 @@
 [build-system]
-requires = ["setuptools>=68.2.0", "wheel", "setuptools_scm[toml]>=7.1.0"]
+requires = ["setuptools>=68.2.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "pytemplate-uv"
 version = "2.0.0"
-description = """PyTemplate UV: A Modern Python Project Generator
-
-A powerful CLI tool that simplifies Python project creation using the `uv` package manager. Streamline your development workflow with standardized, production-ready project templates.
-
-Key Features:
-- 🚀 Rapid project initialization with predefined templates
-- 🔧 Multiple template support (FastAPI, Standard Python projects)
-- 📦 Seamless integration with `uv` for efficient package management
-- 🧪 Built-in testing and quality assurance infrastructure
-- 🔍 Preconfigured linting and type checking support
-
-Ideal for developers looking to bootstrap Python projects quickly with best practices and modern tooling."""
+description = "A deterministic CLI for generating Python project foundations from bundled profiles."
 readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "Leo Liu", email = "yuxuzi@gmail.com"}
 ]
@@ -34,7 +23,6 @@ keywords = [
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Libraries :: Python Modules",
@@ -46,16 +34,12 @@ dependencies = [
     "typer>=0.9.0",
     "rich>=13.7.0",
     "cookiecutter>=2.5.0",
-    "pytest>=7.4.4",
-    "sqlmodel>=0.0.25",
-    "pydantic>=2.11.10",
 ]
 
 [project.urls]
 Homepage = "https://github.com/yuxuzi/pytemplate-uv"
 Repository = "https://github.com/yuxuzi/pytemplate-uv"
 Issues = "https://github.com/yuxuzi/pytemplate-uv/issues"
-Changelog = "https://github.com/yuxuzi/pytemplate-uv/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = [
@@ -72,22 +56,21 @@ docs = [
 ]
 
 [tool.setuptools]
-packages = ["pytemplate"]
+packages = ["pytemplate", "pytemplate.templates"]
 
 [project.scripts]
 # Project management scripts
 pytemplate = "pytemplate.main:app"
-create-project = "pytemplate.main:app"
+pytemplate-uv = "pytemplate.main:app"
 
 [tool.setuptools.package-data]
-"pytemplate" = ["../templates/*", "../templates/**/*", "../templates/**/**/*"]
-
-[tool.setuptools_scm]
-write_to = "version.py"
+"pytemplate" = ["templates/**/*"]
 
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+
+[tool.ruff.lint]
 select = [
     "E",    # pycodestyle errors
     "W",    # pycodestyle warnings
@@ -114,3 +97,8 @@ target-version = ['py311']
 [tool.mypy]
 python_version = "3.11"
 warn_return_any = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra"

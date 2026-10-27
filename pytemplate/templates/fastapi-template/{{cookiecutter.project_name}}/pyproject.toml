@@ -2,6 +2,8 @@
 name = "{{cookiecutter.project_name}}"
 version = "0.1.0"
 description = "{{cookiecutter.description}}"
+readme = "README.md"
+requires-python = ">={{cookiecutter.python_version}}"
 authors = [
     {name = "{{cookiecutter.author}}", email = "{{cookiecutter.email}}"}
 ]
@@ -14,7 +16,6 @@ dependencies = [
     "pydantic>=2.6.0",  # Ensure pydantic is included
     "aiosqlite>=0.19.0",
     "greenlet>=3.0.3", # Add greenlet library
-    "pre-commit>=4.1.0",
 ]
 
 [project.optional-dependencies]

@@ -1,47 +1,82 @@
-"""Tests for the pytemplate-uv CLI."""
-from __future__ import annotations
+"""Black-box tests for the public command-line interface."""
 
-import logging
 from pathlib import Path
 
-import typer
 from typer.testing import CliRunner
 
-from cli import app
+from pytemplate.main import app
 
 runner = CliRunner()
-logger = logging.getLogger(__name__)
 
-def test_fastapi_command(temp_project_dir: str, project_templates_path: str) -> None:
-    """Test the FastAPI project creation command.
 
-    Args:
-        temp_project_dir (str): Temporary directory for project creation
-        project_templates_path (str): Path to project templates
-
-    """
-    logger.info("Starting FastAPI project creation test")
-
-    result = runner.invoke(
-        app,
-        [
-            "create-project",
-            "--template",
-            "fastapi",
-            "--project-name",
-            "test-fastapi-project"
-        ],
-    )
-
-    assert result.exit_code == 0, f"Command failed with output: {result.output}"
-    assert "Creating new project using fastapi template..." in result.output
-
-def test_help_command() -> None:
-    """Test the help command provides useful information."""
+def test_help_describes_the_public_commands() -> None:
     result = runner.invoke(app, ["--help"])
 
     assert result.exit_code == 0
-    assert "Create Python projects from templates using uv package manager" in result.output
-    assert "--template" in result.output
+    assert "create" in result.output
+    assert "list-profiles" in result.output
+    assert "describe-profile" in result.output
 
-    logger.info("Help command test completed successfully")
+
+def test_list_profiles_includes_the_bundled_profiles() -> None:
+    result = runner.invoke(app, ["list-profiles"])
+
+    assert result.exit_code == 0
+    assert "python" in result.output
+    assert "fastapi" in result.output
+
+
+def test_create_dry_run_does_not_write_a_project(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        ["create", "market-data-api", "--output-dir", str(tmp_path), "--no-input", "--dry-run"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "would create" in result.output
+    assert not (tmp_path / "market-data-api").exists()
+
+
+def test_create_renders_the_python_profile(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        ["create", "market-data-api", "--output-dir", str(tmp_path), "--no-input"],
+    )
+
+    project = tmp_path / "market-data-api"
+    assert result.exit_code == 0, result.output
+    assert (project / "pyproject.toml").is_file()
+    assert (project / "market_data_api" / "cli.py").is_file()
+
+
+def test_create_renders_the_fastapi_profile_with_configured_database(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        ["create", "market-data-api", "--profile", "fastapi", "--output-dir", str(tmp_path), "--no-input"],
+    )
+
+    database_module = tmp_path / "market-data-api" / "market_data_api" / "db.py"
+    assert result.exit_code == 0, result.output
+    assert "settings.DATABASE_URL" in database_module.read_text(encoding="utf-8")
+
+
+def test_create_rejects_an_existing_output_without_force(tmp_path: Path) -> None:
+    (tmp_path / "market-data-api").mkdir()
+
+    result = runner.invoke(
+        app,
+        ["create", "market-data-api", "--output-dir", str(tmp_path), "--no-input"],
+    )
+
+    assert result.exit_code == 1
+    assert "Output already exists" in result.output
+
+
+def test_create_rejects_an_invalid_project_name(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        ["create", "Market Data", "--output-dir", str(tmp_path), "--no-input"],
+    )
+
+    assert result.exit_code == 1
+    assert "lowercase slug" in result.output

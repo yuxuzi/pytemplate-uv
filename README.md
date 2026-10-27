@@ -2,21 +2,20 @@
 
 ## Overview
 
-PyTemplate UV is a powerful CLI tool for creating Python project templates using the `uv` package manager. It provides a seamless way to generate standardized project structures with modern development practices.
+PyTemplate is a deterministic CLI for generating Python project foundations from bundled profiles. It uses Cookiecutter for rendering and is compatible with `uv`, but does not require `uv` to run.
 
 ## Features
 
 - 🚀 Quick project initialization
-- 🔧 Support for multiple project templates (FastAPI, Standard Python)
-- 📦 Integrated with `uv` package management
-- 🧪 Comprehensive testing infrastructure
-- 🔍 Linting and type checking support
+- 🔧 Bundled Python and FastAPI profiles
+- 📦 Package-safe profile discovery
+- 🧪 Validated output paths and dry runs
+- 🔍 Explicit profile metadata
 
 ## Prerequisites
 
 - Python 3.11+
-- `uv` package manager
-- `cookiecutter`
+- `cookiecutter` is installed automatically as a package dependency
 
 ## Installation
 
@@ -31,32 +30,32 @@ uv pip install pytemplate-uv
 ### Create a Project
 
 ```bash
-# Create a standard Python project (default)
-pytemplate-uv create-project
+# Discover the available profiles
+pytemplate list-profiles
 
-# Create a FastAPI project
-pytemplate-uv create-project --template fastapi
+# Create a Python CLI/library project
+pytemplate create my-python-project --no-input
 
-# Create a project with a custom name
-pytemplate-uv create-project --name my-awesome-project
+# Create a FastAPI project in an existing parent directory
+pytemplate create market-data-api --profile fastapi --output-dir ./projects --no-input
 
-# Create a project with custom template and name
-pytemplate-uv create-project --template fastapi --name my-api-project
+# Check the selected target without writing files
+pytemplate create market-data-api --profile fastapi --output-dir ./projects --dry-run
 ```
 
 ### Project Creation Options
 
-- `--template`: Choose the project template (default: pyproject)
-  - Options: `pyproject`, `fastapi`
-- `--name`: Specify a custom project name
-- Additional template-specific options can be passed as needed
+- `--profile`, `-p`: Choose a profile (default: `python`)
+- `--output-dir`, `-o`: Existing parent directory for the generated project
+- `--no-input`: Use profile defaults without Cookiecutter prompts
+- `--dry-run`: Validate the request and show the target without writing files
+- `--force`, `-f`: Permit Cookiecutter to overwrite an existing output directory
 
 ### Next Steps After Project Creation
 
-1. `cd` into your project directory
-2. Run `uv venv` to create a virtual environment
-3. Run `uv pip install -e .` to install dependencies
-4. Run `make setup` to set up the development environment
+1. `cd` into your generated project directory.
+2. Follow its generated README and dependency instructions.
+3. Use `uv` or another supported Python workflow to create its environment.
 
 ## Development
 

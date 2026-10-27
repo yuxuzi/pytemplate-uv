@@ -1,0 +1,4 @@
+id = "fastapi"
+name = "FastAPI service"
+description = "An asynchronous FastAPI service foundation with database and API examples."
+version = "1"

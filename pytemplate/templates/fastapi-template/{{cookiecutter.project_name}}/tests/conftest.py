@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel
 
 from {{cookiecutter.package_name}}.core.config import get_settings
-from {{cookiecutter.package_name}}.db import async_session, init_db
+from {{cookiecutter.package_name}}.routers.example import get_db
 from {{cookiecutter.package_name}}.main import app
 
 settings = get_settings()
@@ -60,24 +60,20 @@ async def test_session(test_engine):
         yield session
 
 @pytest.fixture
-async def client():
+async def client(test_session):
     """Create a test client."""
     async def override_get_db():
         """Override the database dependency."""
-        try:
-            async with async_session() as session:
-                yield session
-        except Exception as e:
-            print(f"Database error: {e}")
-            raise
-    
-    app.dependency_overrides = {}
+        yield test_session
+
+    app.dependency_overrides[get_db] = override_get_db
     
     async with AsyncClient(
         base_url="http://test", 
         transport=ASGITransport(app=app)
     ) as ac:
         yield ac
+    app.dependency_overrides.clear()
 
 @pytest.fixture
 def sync_client():
