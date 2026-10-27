@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..core.exceptions import NotFoundError, ValidationError
 from ..db import async_session
-from ..models import ExampleModel
+from ..models import ExampleCreate, ExampleModel
 
 router = APIRouter()
 
@@ -55,7 +55,7 @@ async def get_example(example_id: int, db: AsyncSession = Depends(get_db)):
     return result
 
 @router.post("/examples/", response_model=ExampleModel)
-async def create_example(example: ExampleModel, db: AsyncSession = Depends(get_db)):
+async def create_example(example: ExampleCreate, db: AsyncSession = Depends(get_db)):
     """
     Create a new example.
     
@@ -70,10 +70,11 @@ async def create_example(example: ExampleModel, db: AsyncSession = Depends(get_d
         ValidationError: If example data is invalid
     """
     try:
-        db.add(example)
+        created_example = ExampleModel(**example.model_dump())
+        db.add(created_example)
         await db.commit()
-        await db.refresh(example)
-        return example
+        await db.refresh(created_example)
+        return created_example
     except Exception as e:
         raise ValidationError(str(e))
 

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, JSON, Column
 from pydantic import ConfigDict
@@ -34,7 +34,7 @@ class ExampleModel(SQLModel, table=True):
     tags: Optional[List[str]] = Field(default=None, sa_column=Column(JSON), description="Tags for categorization")
     
     # Timestamps
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: Optional[datetime] = Field(default=None)
 
 

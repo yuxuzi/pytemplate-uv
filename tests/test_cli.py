@@ -56,8 +56,10 @@ def test_create_renders_the_fastapi_profile_with_configured_database(tmp_path: P
     )
 
     database_module = tmp_path / "market-data-api" / "market_data_api" / "db.py"
+    environment_file = tmp_path / "market-data-api" / ".env"
     assert result.exit_code == 0, result.output
     assert "settings.DATABASE_URL" in database_module.read_text(encoding="utf-8")
+    assert "MARKET_DATA_API_LOG_FORMAT" in environment_file.read_text(encoding="utf-8")
 
 
 def test_create_rejects_an_existing_output_without_force(tmp_path: Path) -> None:
