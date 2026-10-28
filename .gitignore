@@ -60,9 +60,6 @@ coverage.xml
 *.log
 logs/
 
-# UV Package Manager
-uv.lock
-
 # Jupyter Notebooks
 .ipynb_checkpoints
 
