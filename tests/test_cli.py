@@ -182,3 +182,26 @@ def test_version_option_prints_the_version() -> None:
 
     assert result.exit_code == 0
     assert result.output.startswith("pytemplate-uv ")
+
+
+def test_create_project_is_a_full_alias_of_create(tmp_path: Path) -> None:
+    listed = runner.invoke(app, ["--help"])
+    created = runner.invoke(
+        app,
+        [
+            "create-project",
+            "market-data-api",
+            "--profile",
+            "fastapi",
+            "--output-dir",
+            str(tmp_path),
+            "--no-input",
+            "--data",
+            "description=Alias check",
+        ],
+    )
+
+    assert "create-project" in listed.output
+    assert created.exit_code == 0, created.output
+    readme = (tmp_path / "market-data-api" / "README.md").read_text(encoding="utf-8")
+    assert "Alias check" in readme

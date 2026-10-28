@@ -53,7 +53,7 @@ Without `--no-input`, Copier prompts for each template question.
 
 | Command | Purpose |
 | --- | --- |
-| `pytemplate create NAME` | Render a project into `OUTPUT_DIR/NAME` |
+| `pytemplate create NAME` | Render a project into `OUTPUT_DIR/NAME` (`create-project` is an optional alias) |
 | `pytemplate list-profiles` / `describe-profile ID` | Show profiles and their template inputs |
 | `pytemplate list-components` / `describe-component ID` | Show the component contract |
 | `pytemplate validate FILE` | Validate a TOML render request without writing files |

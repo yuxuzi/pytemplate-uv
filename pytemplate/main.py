@@ -182,26 +182,10 @@ def create(
     )
 
 
-@app.command("create-project", hidden=True)
-def create_project_compat(
-    project_name: Annotated[str, typer.Argument(help="Lowercase project slug")],
-    profile: Annotated[str, typer.Option("--profile", "-p")] = "python",
-    output_dir: Annotated[Path, typer.Option("--output-dir", "-o")] = Path("."),
-    no_input: Annotated[bool, typer.Option("--no-input")] = False,
-    force: Annotated[bool, typer.Option("--force", "-f")] = False,
-    dry_run: Annotated[bool, typer.Option("--dry-run")] = False,
-) -> None:
-    """Compatibility alias for the former command name."""
-    _render_and_report(
-        RenderRequest(
-            profile_id=profile,
-            project_name=project_name,
-            output_dir=output_dir,
-            no_input=no_input,
-            overwrite=force,
-            dry_run=dry_run,
-        )
-    )
+# Optional, fully equivalent spelling of `create` (same arguments and options).
+app.command("create-project", help="Alias of `create`; accepts the same arguments and options.")(
+    create
+)
 
 
 @app.command("list-profiles")
