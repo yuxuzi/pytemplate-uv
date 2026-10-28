@@ -5,35 +5,72 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
-  test-and-build:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check pytemplate tests
+      - run: uv run mypy
+
+  test:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-        python-version: ["3.11", "3.12"]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ matrix.python-version }}
-      - run: uv run --extra dev pytest
-      - run: uv build
+      - run: uv sync --locked
+      - run: uv run pytest
 
-  profile-smoke:
-    needs: test-and-build
+  generated-projects:
+    # Render every profile and run its own lifecycle commands (sync, lint, format, mypy, tests).
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        profile: [python, fastapi]
+        python-version: ["3.11", "3.14"]
     runs-on: ${{ matrix.os }}
+    env:
+      PYTEMPLATE_SMOKE: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.11"
-      - run: uv run --extra dev pytemplate create profile-smoke --profile ${{ matrix.profile }} --output-dir . --no-input
-      - run: uv run --extra dev --extra test pytest
-        working-directory: profile-smoke
+          python-version: ${{ matrix.python-version }}
+      - run: uv sync --locked
+      - run: uv run pytest tests/test_generated_projects.py
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv build
+      - run: uvx twine check --strict dist/*
+      - name: Generate projects from the built wheel
+        run: |
+          wheel="$(ls dist/*.whl)"
+          for profile in python fastapi; do
+            uvx --from "$wheel" pytemplate create "wheel-$profile" --profile "$profile" \
+              --output-dir "$RUNNER_TEMP" --no-input
+            for path in .gitignore .github/workflows/ci.yml CLAUDE.md .pytemplate.toml \
+                .copier-answers.yml; do
+              test -f "$RUNNER_TEMP/wheel-$profile/$path"
+            done
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/

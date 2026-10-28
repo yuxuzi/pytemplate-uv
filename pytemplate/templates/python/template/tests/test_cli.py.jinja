@@ -1,0 +1,36 @@
+"""Tests for the command-line interface."""
+
+from typer.testing import CliRunner
+
+from {{ package_name }}.cli import app
+
+runner = CliRunner()
+
+
+def test_hello_default() -> None:
+    result = runner.invoke(app, ["hello"])
+
+    assert result.exit_code == 0
+    assert "Hello, World!" in result.output
+
+
+def test_hello_with_name() -> None:
+    result = runner.invoke(app, ["hello", "--name", "Alice"])
+
+    assert result.exit_code == 0
+    assert "Hello, Alice!" in result.output
+
+
+def test_hello_formal() -> None:
+    result = runner.invoke(app, ["hello", "--name", "Bob", "--formal"])
+
+    assert result.exit_code == 0
+    assert "Greetings, esteemed Bob." in result.output
+
+
+def test_info() -> None:
+    result = runner.invoke(app, ["info"])
+
+    assert result.exit_code == 0
+    assert "Project Information" in result.output
+    assert "{{ package_name }}" in result.output

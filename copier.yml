@@ -1,0 +1,4 @@
+# Git entry point used by `copier update` (gh:yuxuzi/pytemplate-uv at a vX.Y.Z tag).
+# Keep in sync with pytemplate/templates/copier.yml; questions live in questions.yml.
+_subdirectory: "pytemplate/templates/{{ profile }}/template"
+--- !include pytemplate/templates/questions.yml

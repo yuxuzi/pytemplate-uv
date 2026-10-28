@@ -1,0 +1,8 @@
+id = "database"
+name = "Database foundation"
+description = "SQLAlchemy-backed persistence foundation included by the FastAPI profile."
+version = "1"
+compatible_profiles = ["fastapi"]
+dependency_groups = []
+template_fragments = ["fastapi-template"]
+configuration_schema = "DATABASE_URL selects the database adapter."

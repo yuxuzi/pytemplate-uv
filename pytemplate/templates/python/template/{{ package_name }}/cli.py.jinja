@@ -1,0 +1,49 @@
+"""Command-line interface for {{ project_name }}."""
+
+from importlib.metadata import metadata
+from typing import Annotated
+
+import typer
+from rich.console import Console
+from rich.table import Table
+
+from {{ package_name }}.core import greet
+
+app = typer.Typer(
+    help="Command-line interface for {{ project_name }}.",
+    no_args_is_help=True,
+)
+console = Console()
+
+
+@app.command()
+def hello(
+    name: Annotated[str, typer.Option(help="Name to greet.")] = "World",
+    formal: Annotated[bool, typer.Option("--formal", "-f", help="Use a formal greeting.")] = False,
+) -> None:
+    """Greet someone."""
+    console.print(greet(name, formal=formal), style="bold green")
+
+
+@app.command()
+def info() -> None:
+    """Show project information."""
+    table = Table(title="Project Information")
+    table.add_column("Attribute", style="cyan")
+    table.add_column("Value", style="magenta")
+    table.add_row("Name", "{{ project_name }}")
+    table.add_row("Package", "{{ package_name }}")
+    table.add_row(
+        "Description",
+        metadata("{{ project_name }}")["Summary"],
+    )
+    console.print(table)
+
+
+def main() -> None:
+    """Run the command-line interface."""
+    app()
+
+
+if __name__ == "__main__":
+    main()

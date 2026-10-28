@@ -1,0 +1,76 @@
+# Settings and questions shared by every profile. Included by pytemplate/templates/copier.yml
+# (bundled rendering) and by the repository-root copier.yml (`copier update` from git tags).
+# Templates must never declare _tasks or _migrations. To keep `copier update` working, add
+# questions rather than renaming or removing them.
+_min_copier_version: "9.4"
+_templates_suffix: .jinja
+
+profile:
+  type: str
+  help: Project profile
+  choices:
+    - python
+    - fastapi
+
+project_name:
+  type: str
+  help: Lowercase project slug
+  validator: >-
+    {% if not (project_name | regex_search('^[a-z][a-z0-9]*(-[a-z0-9]+)*$')) %}
+    Use a lowercase slug beginning with a letter.
+    {% endif %}
+
+package_name:
+  type: str
+  help: Importable Python package name
+  default: "{{ project_name | lower | replace('-', '_') }}"
+  validator: >-
+    {% if not (package_name | regex_search('^[a-z][a-z0-9_]*$')) %}
+    Use a lowercase Python identifier.
+    {% endif %}
+
+description:
+  type: str
+  validator: >-
+    {% if '"' in description or '\\' in description or '\n' in description or not description.strip() %}
+    Use non-empty text on one line without double quotes or backslashes.
+    {% endif %}
+  help: One-line project description
+  default: "{{ 'A FastAPI service' if profile == 'fastapi' else 'A Python package' }}"
+
+author:
+  type: str
+  validator: >-
+    {% if '"' in author or '\\' in author or '\n' in author or not author.strip() %}
+    Use non-empty text on one line without double quotes or backslashes.
+    {% endif %}
+  help: Author name
+  default: Your Name
+
+email:
+  type: str
+  validator: >-
+    {% if '"' in email or '\\' in email or '\n' in email or not email.strip() %}
+    Use non-empty text on one line without double quotes or backslashes.
+    {% endif %}
+  help: Author email
+  default: your@email.com
+
+python_version:
+  type: str
+  help: Minimum supported Python version
+  default: "3.11"
+  choices:
+    - "3.11"
+    - "3.12"
+    - "3.13"
+    - "3.14"
+
+license:
+  type: str
+  help: SPDX license expression, for example MIT or Apache-2.0
+  validator: >-
+    {% if not (license | regex_search('^[A-Za-z0-9.+-]+( (AND|OR|WITH) [A-Za-z0-9.+-]+)*$')) %}
+    Use an SPDX license expression such as MIT or Apache-2.0.
+    {% endif %}
+  default: MIT

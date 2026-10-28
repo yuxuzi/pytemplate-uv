@@ -1,0 +1,52 @@
+# {{ project_name }}
+
+{{ description }}
+
+## Requirements
+
+[uv](https://docs.astral.sh/uv/) is the only tool you need. It installs Python {{ python_version }}+
+and every development tool on demand, on Windows, macOS, and Linux.
+
+## Getting started
+
+```bash
+uv sync                      # create .venv and install the project with its dev group
+uv lock                      # create uv.lock, then commit it for reproducible installs
+uv run {{ package_name }} --help
+uv run {{ package_name }} hello --name World
+```
+
+## Development
+
+| Task | Command |
+| --- | --- |
+| Run tests with coverage | `uv run pytest` |
+| Lint | `uv run ruff check .` |
+| Format | `uv run ruff format .` |
+| Type-check | `uv run mypy {{ package_name }}` |
+| Build sdist and wheel | `uv build` |
+| Install git hooks | `uvx pre-commit install` |
+
+Add runtime dependencies with `uv add <package>` and development tools with
+`uv add --dev <package>`.
+
+## Container
+
+```bash
+docker build -t {{ project_name }} .
+docker run --rm {{ project_name }} hello --name World
+```
+
+## Project layout
+
+```
+{{ package_name }}/
+  cli.py      # Typer command-line interface (thin layer)
+  core.py     # business logic, testable without the CLI
+  py.typed    # marks the package as typed
+tests/        # pytest suite
+```
+
+## License
+
+{{ license }} — {{ author }} <{{ email }}>

@@ -1,0 +1,8 @@
+id = "cli"
+name = "Command-line interface"
+description = "Typer-based command-line entry point included by the Python profile."
+version = "1"
+compatible_profiles = ["python"]
+dependency_groups = []
+template_fragments = ["pyproject-template"]
+configuration_schema = "No additional configuration."

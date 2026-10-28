@@ -1,0 +1,3 @@
+# Bundled entry point used by `pytemplate create`; see questions.yml.
+_subdirectory: "{{ profile }}/template"
+--- !include questions.yml
