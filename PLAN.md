@@ -1,6 +1,7 @@
 # PLAN.md — Phase 2: critique, Copier migration, generated CLAUDE.md
 
-Working plan for Phase 2 of [ENGINEERING_REVIEW_PLAN.md](ENGINEERING_REVIEW_PLAN.md). It replaces the
+Working plan for Phase 2 of the QuantFoundry engineering plan, which now lives in the
+[quant-agent-os](https://github.com/yuxuzi/quant-agent-os) repository at `docs/ENGINEERING_REVIEW_PLAN.md`. It replaces the
 older "Phase 2 review findings" section there, most of which (unrunnable tests, CLI contract drift,
 template packaging, subprocess rendering) was fixed before this phase began.
 
