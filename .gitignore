@@ -80,3 +80,5 @@ uv.lock
 .env.development.local
 .env.test.local
 .env.production.local
+# Locally installed copy of the bundled agent skill
+.claude/skills/pytemplate/

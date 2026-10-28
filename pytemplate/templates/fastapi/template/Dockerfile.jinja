@@ -1,0 +1,26 @@
+FROM python:{{ python_version }}-slim
+
+COPY --from=ghcr.io/astral-sh/uv:0.12.17 /uv /uvx /bin/
+
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    PATH="/app/.venv/bin:$PATH" \
+    {{ package_name|upper }}_HOST=0.0.0.0 \
+    {{ package_name|upper }}_DATABASE_URL=sqlite+aiosqlite:////app/data/{{ project_name }}.db
+
+WORKDIR /app
+
+# Install dependencies first for better layer caching, then the project itself.
+COPY pyproject.toml uv.lock* README.md ./
+RUN uv sync --no-dev --no-install-project
+COPY . .
+RUN uv sync --no-dev
+
+RUN useradd --create-home appuser && mkdir -p /app/data && chown appuser /app/data
+USER appuser
+
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=4)"]
+
+CMD ["{{ package_name }}", "serve"]

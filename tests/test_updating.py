@@ -1,0 +1,205 @@
+"""Tests for `copier update` support, using a local git repository as the template source."""
+
+import shutil
+import subprocess
+from pathlib import Path
+
+import pytest
+import yaml
+from copier import Settings, run_copy
+
+from pytemplate.rendering import RenderRequest, generator_version, render
+from pytemplate.updating import UpdateError, UpdateRequest, update
+
+pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git is required")
+
+REPO_ROOT = Path(__file__).parent.parent
+NEW_README_LINE = "Updated by template v99."
+
+
+@pytest.fixture(autouse=True)
+def _git_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    for prefix in ("GIT_AUTHOR", "GIT_COMMITTER"):
+        monkeypatch.setenv(f"{prefix}_NAME", "Test")
+        monkeypatch.setenv(f"{prefix}_EMAIL", "test@example.com")
+
+
+def _git(cwd: Path, *args: str) -> str:
+    completed = subprocess.run(
+        ["git", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", *args],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return completed.stdout
+
+
+def _commit_all(cwd: Path, message: str) -> None:
+    _git(cwd, "add", "-A")
+    _git(cwd, "commit", "-q", "-m", message)
+
+
+@pytest.fixture
+def template_source(tmp_path: Path) -> Path:
+    """Create a git copy of the templates, tagged with the installed version."""
+    source = tmp_path / "template-source"
+    shutil.copytree(
+        REPO_ROOT / "pytemplate" / "templates",
+        source / "pytemplate" / "templates",
+        ignore=shutil.ignore_patterns("__pycache__"),
+    )
+    shutil.copy2(REPO_ROOT / "copier.yml", source / "copier.yml")
+    _git(source, "init", "-q")
+    _commit_all(source, "templates")
+    _git(source, "tag", f"v{generator_version()}")
+    return source
+
+
+@pytest.fixture
+def project(tmp_path: Path, template_source: Path) -> Path:
+    """Generate and commit a project from the fixture source."""
+    output = tmp_path / "projects"
+    output.mkdir()
+    path = render(
+        RenderRequest(
+            profile_id="python",
+            project_name="demo-app",
+            output_dir=output,
+            no_input=True,
+            template_source=str(template_source),
+        )
+    ).project_path
+    _git(path, "init", "-q")
+    _commit_all(path, "generated")
+    return path
+
+
+def _release_new_template(source: Path) -> None:
+    readme = source / "pytemplate" / "templates" / "python" / "template" / "README.md.jinja"
+    readme.write_text(readme.read_text(encoding="utf-8") + f"\n{NEW_README_LINE}\n", "utf-8")
+    _commit_all(source, "new template")
+    _git(source, "tag", "v99.0.0")
+
+
+def test_answers_file_records_the_template_source(project: Path, template_source: Path) -> None:
+    answers = yaml.safe_load((project / ".copier-answers.yml").read_text(encoding="utf-8"))
+
+    assert answers["_src_path"] == str(template_source)
+    assert answers["_commit"] == f"v{generator_version()}"
+    assert answers["profile"] == "python"
+
+
+def test_dry_run_changes_nothing(project: Path, template_source: Path) -> None:
+    _release_new_template(template_source)
+
+    result = update(UpdateRequest(project, to_ref="v99.0.0"))
+
+    assert result.applied is False
+    assert _git(project, "status", "--porcelain") == ""
+    assert NEW_README_LINE not in (project / "README.md").read_text(encoding="utf-8")
+
+
+def test_apply_merges_template_changes_and_keeps_user_edits(
+    project: Path, template_source: Path
+) -> None:
+    core = project / "demo_app" / "core.py"
+    core.write_text(core.read_text(encoding="utf-8") + "\nUSER_CONSTANT = 42\n", "utf-8")
+    _commit_all(project, "user edit")
+    _release_new_template(template_source)
+
+    result = update(UpdateRequest(project, to_ref="v99.0.0", apply=True))
+
+    answers = yaml.safe_load((project / ".copier-answers.yml").read_text(encoding="utf-8"))
+    manifest = (project / ".pytemplate.toml").read_text(encoding="utf-8")
+    assert result.from_ref == f"v{generator_version()}"
+    assert NEW_README_LINE in (project / "README.md").read_text(encoding="utf-8")
+    assert "USER_CONSTANT = 42" in core.read_text(encoding="utf-8")
+    assert answers["_commit"] == "v99.0.0"
+    assert ".git/" not in manifest
+
+
+def test_update_refuses_a_dirty_tree(project: Path) -> None:
+    (project / "scratch.txt").write_text("uncommitted", encoding="utf-8")
+
+    with pytest.raises(UpdateError, match="uncommitted changes"):
+        update(UpdateRequest(project, to_ref="v99.0.0"))
+
+
+def test_update_requires_an_answers_file(tmp_path: Path) -> None:
+    with pytest.raises(UpdateError, match="2.1 or later"):
+        update(UpdateRequest(tmp_path, to_ref="v99.0.0"))
+
+
+def test_update_requires_git(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(shutil, "which", lambda name: None)
+
+    with pytest.raises(UpdateError, match="git is required"):
+        update(UpdateRequest(project, to_ref="v99.0.0"))
+
+
+def test_apply_merges_edits_to_the_same_file(project: Path, template_source: Path) -> None:
+    readme = project / "README.md"
+    readme.write_text("User introduction.\n\n" + readme.read_text(encoding="utf-8"), "utf-8")
+    _commit_all(project, "user edits README")
+    _release_new_template(template_source)
+
+    update(UpdateRequest(project, to_ref="v99.0.0", apply=True))
+
+    merged = readme.read_text(encoding="utf-8")
+    assert merged.startswith("User introduction.")
+    assert NEW_README_LINE in merged
+    assert "<<<<<<<" not in merged
+
+
+@pytest.mark.parametrize("profile_id", ["python", "fastapi"])
+def test_git_entry_point_renders_the_same_files_as_the_bundled_one(
+    profile_id: str, tmp_path: Path, template_source: Path
+) -> None:
+    bundled = render(
+        RenderRequest(
+            profile_id=profile_id,
+            project_name="demo-app",
+            output_dir=tmp_path,
+            no_input=True,
+            template_source=str(template_source),
+        )
+    ).project_path
+    from_git = tmp_path / "from-git"
+    run_copy(
+        str(template_source),
+        from_git,
+        data={"profile": profile_id, "project_name": "demo-app"},
+        vcs_ref=f"v{generator_version()}",
+        defaults=True,
+        quiet=True,
+        settings=Settings(),
+    )
+
+    def tree(root: Path) -> dict[str, bytes]:
+        skipped = {".copier-answers.yml", ".pytemplate.toml"}
+        return {
+            path.relative_to(root).as_posix(): path.read_bytes()
+            for path in root.rglob("*")
+            if path.is_file() and path.name not in skipped
+        }
+
+    assert tree(bundled) == tree(from_git)
+
+
+def test_no_template_file_is_ignored_by_git() -> None:
+    """A git-ignored template file would be missing from release tags and `copier update`."""
+    files = [
+        str(path.relative_to(REPO_ROOT))
+        for path in (REPO_ROOT / "pytemplate" / "templates").rglob("*")
+        if path.is_file() and "__pycache__" not in path.parts
+    ]
+    ignored = subprocess.run(
+        ["git", "check-ignore", "--no-index", *files],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert ignored.stdout == ""

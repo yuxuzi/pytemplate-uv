@@ -1,0 +1,65 @@
+[project]
+name = "{{ project_name }}"
+version = "0.1.0"
+description = "{{ description }}"
+readme = "README.md"
+requires-python = ">={{ python_version }}"
+license = "{{ license }}"
+authors = [{ name = "{{ author }}", email = "{{ email }}" }]
+classifiers = [
+    "Framework :: FastAPI",
+    "Programming Language :: Python :: 3",
+{%- for version in ["3.11", "3.12", "3.13", "3.14"] if version.split(".")[1] | int >= python_version.split(".")[1] | int %}
+    "Programming Language :: Python :: {{ version }}",
+{%- endfor %}
+    "Typing :: Typed",
+]
+dependencies = [
+    "aiosqlite>=0.20",
+    "fastapi[standard]>=0.115",
+    "pydantic-settings>=2.6",
+    "rich>=13.7",
+    "sqlalchemy[asyncio]>=2.0.30",
+    "sqlmodel>=0.0.22",
+    "typer>=0.12",
+]
+
+[project.scripts]
+{{ package_name }} = "{{ package_name }}.cli:main"
+
+[dependency-groups]
+dev = [
+    "mypy>=1.11",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+]
+
+[build-system]
+requires = ["uv_build>=0.8,<0.13"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
+
+[tool.ruff]
+line-length = 100
+target-version = "py{{ python_version | replace('.', '') }}"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "N", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "{{ python_version }}"
+strict = true
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-ra --cov={{ package_name }} --cov-report=term-missing"
+
+[tool.coverage.run]
+branch = true

@@ -1,0 +1,48 @@
+# CLAUDE.md
+
+Guidance for Claude Code and other coding agents working in `{{ project_name }}`.
+
+## Project
+
+{{ description.rstrip('.') }}. An asynchronous FastAPI service (`{{ package_name }}`) on Python {{ python_version }}+ with SQLModel persistence. `uv` is the only required tool: never use pip, virtualenv activation, or make.
+
+## Commands
+
+- Install or refresh the environment: `uv sync`
+- Test: `uv run pytest`
+- Lint: `uv run ruff check .`
+- Format: `uv run ruff format .` (check only: `uv run ruff format --check .`)
+- Type-check: `uv run mypy {{ package_name }}`
+- Run the API with reload: `uv run fastapi dev {{ package_name }}/main.py`
+- One-off tools without installing them: `uvx <tool>` (for example `uvx pre-commit run --all-files`)
+
+## Layout
+
+- `{{ package_name }}/main.py` — `create_app()` factory, middleware, `/health`, router registration.
+- `{{ package_name }}/routers/` — HTTP endpoints; keep handlers thin.
+- `{{ package_name }}/models.py` — the table model plus separate create, update, and read schemas.
+- `{{ package_name }}/db.py` — engine and the `get_session` dependency.
+- `{{ package_name }}/core/` — settings, error types, and middleware.
+- `tests/` — pytest suite; `conftest.py` provides an in-memory database and an HTTP client.
+
+## Conventions
+
+- Read configuration only through `get_settings()`; environment variables use the `{{ package_name|upper }}_` prefix. Never hard-code URLs, hosts, or credentials.
+- Get database sessions through the `get_session` dependency; handlers must not create engines or clients.
+- Raise `AppError` subclasses for expected failures so responses keep the `ErrorResponse` shape.
+- Never return table models with internal fields directly; declare a `response_model` schema.
+- Type-annotate everything; mypy runs in strict mode and must stay clean.
+- Ruff owns formatting and import order. Add dependencies with `uv add` or `uv add --dev`; never edit `uv.lock` by hand.
+
+## Testing
+
+- Add or update tests with every behavior change, including error responses.
+- Use the `client` and `session` fixtures; tests must not touch a real database, the network, or real credentials.
+- Before reporting work as done, run the test, lint, format, and type-check commands above and report the real results.
+
+## Safety
+
+- Never read, print, or commit `.env` files, secrets, or tokens; production values come from the deployment environment.
+- Keep `ALLOWED_HOSTS` and `CORS_ORIGINS` explicit; never add wildcards for production.
+- Do not change CI workflows, Docker or deployment files, the database schema, or dependency version bounds without asking first.
+- Prefer small, reviewable diffs; explain any change that touches more than one layer.

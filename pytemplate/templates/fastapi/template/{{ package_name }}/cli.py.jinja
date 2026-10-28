@@ -1,0 +1,55 @@
+"""Command-line interface for {{ project_name }}."""
+
+from typing import Annotated
+
+import typer
+import uvicorn
+from rich.console import Console
+from rich.table import Table
+
+from .core.config import get_settings
+
+app = typer.Typer(
+    help="Command-line interface for {{ project_name }}.",
+    no_args_is_help=True,
+)
+console = Console()
+
+
+@app.command()
+def serve(
+    host: Annotated[str | None, typer.Option(help="Bind address; defaults to settings.")] = None,
+    port: Annotated[int | None, typer.Option(help="Port; defaults to settings.")] = None,
+    reload: Annotated[bool, typer.Option(help="Reload on code changes (development).")] = False,
+) -> None:
+    """Run the API with uvicorn."""
+    settings = get_settings()
+    uvicorn.run(
+        "{{ package_name }}.main:app",
+        host=host or settings.HOST,
+        port=port or settings.PORT,
+        reload=reload,
+    )
+
+
+@app.command()
+def info() -> None:
+    """Show non-secret runtime settings."""
+    settings = get_settings()
+    table = Table(title="Project Information")
+    table.add_column("Setting", style="cyan")
+    table.add_column("Value", style="magenta")
+    table.add_row("Name", settings.APP_NAME)
+    table.add_row("Version", settings.APP_VERSION)
+    table.add_row("Environment", settings.ENVIRONMENT)
+    table.add_row("API prefix", settings.API_V1_PREFIX)
+    console.print(table)
+
+
+def main() -> None:
+    """Run the command-line interface."""
+    app()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,45 @@
+name: Release
+
+# Publishing uses PyPI Trusted Publishing; no API token is stored in the repository.
+# One-time setup: on PyPI, add a trusted publisher for this repository with workflow
+# "release.yml" and environment "pypi", and create the "pypi" environment in GitHub.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Check that the tag matches the project version
+        run: test "v$(uv version --short)" = "$GITHUB_REF_NAME"
+      - run: uv sync --locked
+      - run: uv run pytest
+      - run: uv build
+      - run: uvx twine check --strict dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/pytemplate-uv/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: astral-sh/setup-uv@v6
+      - run: uv publish --trusted-publishing always dist/*

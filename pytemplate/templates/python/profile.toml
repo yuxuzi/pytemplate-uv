@@ -1,0 +1,11 @@
+id = "python"
+name = "Python CLI or library"
+description = "A compact Python package with a CLI, tests, and development tooling."
+version = "2"
+aliases = ["pyproject"]
+supported_python = ["3.11", "3.12", "3.13", "3.14"]
+components = ["cli"]
+default_components = ["cli"]
+configuration_schema = "questions.yml"
+lifecycle_commands = ["uv sync", "uv run ruff check .", "uv run ruff format --check .", "uv run mypy {package}", "uv run pytest"]
+security_posture = "No external services or secrets are required to render or test the default project."

@@ -1,0 +1,67 @@
+# {{ project_name }}
+
+{{ description }}
+
+An asynchronous FastAPI service with SQLModel persistence, typed settings, structured errors,
+request IDs, and deny-by-default host and CORS policies.
+
+## Requirements
+
+[uv](https://docs.astral.sh/uv/) is the only tool you need. It installs Python {{ python_version }}+
+and every development tool on demand, on Windows, macOS, and Linux.
+
+## Getting started
+
+```bash
+uv sync                                        # create .venv with the dev group
+uv lock                                        # create uv.lock, then commit it
+uv run fastapi dev {{ package_name }}/main.py   # auto-reloading development server
+```
+
+Open <http://localhost:8000/docs> for interactive API documentation and
+<http://localhost:8000/health> for the health check.
+
+## Configuration
+
+Settings live in `{{ package_name }}/core/config.py`. Override any of them with an environment
+variable prefixed `{{ package_name|upper }}_`, or copy `.env.example` to `.env` for local values.
+`.env` is git-ignored; never commit it.
+
+In production, set `{{ package_name|upper }}_ENVIRONMENT=production` and list the real
+`{{ package_name|upper }}_ALLOWED_HOSTS` and `{{ package_name|upper }}_CORS_ORIGINS`; wildcards are rejected there.
+
+## Development
+
+| Task | Command |
+| --- | --- |
+| Run tests with coverage | `uv run pytest` |
+| Lint | `uv run ruff check .` |
+| Format | `uv run ruff format .` |
+| Type-check | `uv run mypy {{ package_name }}` |
+| Serve without reload | `uv run {{ package_name }} serve` |
+| Build sdist and wheel | `uv build` |
+| Install git hooks | `uvx pre-commit install` |
+
+## Container
+
+```bash
+docker build -t {{ project_name }} .
+docker run --rm -p 8000:8000 {{ project_name }}
+```
+
+## Project layout
+
+```
+{{ package_name }}/
+  main.py          # application factory, /health, router registration
+  routers/         # HTTP endpoints (thin)
+  models.py        # SQLModel table model and API schemas
+  db.py            # engine and per-request session dependency
+  core/config.py   # typed settings
+  core/exceptions.py, core/middleware.py
+tests/             # pytest suite with an isolated in-memory database
+```
+
+## License
+
+{{ license }} — {{ author }} <{{ email }}>

@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: [
+{%- for version in ["3.11", "3.12", "3.13", "3.14"] if version.split(".")[1] | int >= python_version.split(".")[1] | int -%}
+"{{ version }}"{{ ", " if not loop.last }}
+{%- endfor -%}
+]
+    runs-on: {% raw %}${{ matrix.os }}{% endraw %}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: {% raw %}${{ matrix.python-version }}{% endraw %}
+      - run: uv sync
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy {{ package_name }}
+      - run: uv run pytest
+      - run: uv build
