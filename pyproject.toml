@@ -38,6 +38,7 @@ Changelog = "https://github.com/yuxuzi/pytemplate-uv/blob/main/CHANGELOG.md"
 [project.scripts]
 pytemplate = "pytemplate.main:app"
 pytemplate-uv = "pytemplate.main:app"
+create-project = "pytemplate.main:create_project_app"
 
 [dependency-groups]
 dev = [

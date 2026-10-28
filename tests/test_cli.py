@@ -4,7 +4,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from pytemplate.main import app
+from pytemplate.main import app, create_project_app
 
 runner = CliRunner()
 
@@ -205,3 +205,13 @@ def test_create_project_is_a_full_alias_of_create(tmp_path: Path) -> None:
     assert created.exit_code == 0, created.output
     readme = (tmp_path / "market-data-api" / "README.md").read_text(encoding="utf-8")
     assert "Alias check" in readme
+
+
+def test_create_project_executable_runs_create_directly(tmp_path: Path) -> None:
+    result = runner.invoke(
+        create_project_app,
+        ["market-data-api", "-p", "fastapi", "-o", str(tmp_path), "--no-input"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert (tmp_path / "market-data-api" / "CLAUDE.md").is_file()

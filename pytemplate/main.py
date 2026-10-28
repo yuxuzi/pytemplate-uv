@@ -187,6 +187,14 @@ app.command("create-project", help="Alias of `create`; accepts the same argument
     create
 )
 
+# Standalone `create-project` executable: `create-project NAME [OPTIONS]` runs `create` directly.
+create_project_app = typer.Typer(
+    name="create-project",
+    help="Create a project from a bundled profile (same as `pytemplate create`).",
+    add_completion=False,
+)
+create_project_app.command()(create)
+
 
 @app.command("list-profiles")
 def list_profiles_command(as_json: JsonOption = False) -> None:

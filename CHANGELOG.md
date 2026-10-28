@@ -45,8 +45,9 @@ All notable changes to this project are documented here. The format follows
 - `--data KEY=VALUE` on `create`, and a `[data]` table in TOML render requests.
 - `describe-profile` lists template inputs.
 - `pytemplate --version`.
-- `create-project` is now a visible, fully equivalent alias of `create` (previously hidden and
-  missing `--component`, `--data`, and `--template-source`).
+- A `create-project NAME [OPTIONS]` executable that runs `create` directly. `pytemplate
+  create-project` is now a visible, fully equivalent alias; previously it was hidden and lacked
+  `--component`, `--data`, and `--template-source`.
 - `.pytemplate.toml` records a SHA-256 inventory of rendered files.
 - Validators for `package_name`, `license` (SPDX), and single-line text answers.
 - A release workflow that publishes to PyPI through Trusted Publishing.

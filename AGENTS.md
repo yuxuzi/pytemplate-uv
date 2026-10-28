@@ -5,7 +5,7 @@ projects carry their own `CLAUDE.md`. Claude Code reads this file through `CLAUD
 
 ## What this project is
 
-A Typer CLI (`pytemplate`, also `pytemplate-uv`) that renders bundled
+A Typer CLI (`pytemplate`, also `pytemplate-uv`, plus a `create-project` shortcut) that renders bundled
 [Copier](https://copier.readthedocs.io/) templates into uv-native projects. It can also upgrade
 those projects later with `copier update`. It is published to PyPI as `pytemplate-uv` and supports
 CPython 3.11–3.14 on Windows, macOS, and Linux. `uv` and `uvx` are the only required tools; never

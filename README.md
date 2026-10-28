@@ -47,13 +47,22 @@ uv sync
 uv run pytest
 ```
 
+`create-project` is an optional shortcut installed with the package. It takes the same arguments
+and options as `pytemplate create`:
+
+```bash
+create-project market-data --no-input
+uvx --from pytemplate-uv create-project pricing-api -p fastapi --no-input
+```
+
 Without `--no-input`, Copier prompts for each template question.
 
 ### Commands
 
 | Command | Purpose |
 | --- | --- |
-| `pytemplate create NAME` | Render a project into `OUTPUT_DIR/NAME` (`create-project` is an optional alias) |
+| `pytemplate create NAME` | Render a project into `OUTPUT_DIR/NAME` |
+| `create-project NAME` | Standalone shortcut for `pytemplate create` (same options; also `pytemplate create-project`) |
 | `pytemplate list-profiles` / `describe-profile ID` | Show profiles and their template inputs |
 | `pytemplate list-components` / `describe-component ID` | Show the component contract |
 | `pytemplate validate FILE` | Validate a TOML render request without writing files |
