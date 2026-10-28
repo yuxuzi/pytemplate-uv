@@ -24,6 +24,9 @@ All notable changes to this project are documented here. The format follows
   - a `serve` CLI command;
   - an isolated in-memory test database.
 - The package builds with `uv_build`; development tools moved to a `dev` dependency group.
+- GitHub Actions (this repo and generated projects) use `actions/checkout@v7`,
+  `astral-sh/setup-uv@v10.3.2`, `actions/upload-artifact@v7`, and `actions/download-artifact@v8`,
+  which run on Node.js 24 instead of the deprecated Node.js 20.
 
 ### Added
 
