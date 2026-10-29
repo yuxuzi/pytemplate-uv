@@ -9,7 +9,7 @@ authors = [{ name = "{{ author }}", email = "{{ email }}" }]
 classifiers = [
     "Framework :: FastAPI",
     "Programming Language :: Python :: 3",
-{%- for version in ["3.11", "3.12", "3.13", "3.14"] if version.split(".")[1] | int >= python_version.split(".")[1] | int %}
+{%- for version in ["3.11", "3.12", "3.13", "3.14", "3.15"] if version.split(".")[1] | int >= python_version.split(".")[1] | int %}
     "Programming Language :: Python :: {{ version }}",
 {%- endfor %}
     "Typing :: Typed",

@@ -2,7 +2,7 @@
 
 import asyncio
 from collections.abc import Callable, Sequence
-from typing import Any
+from typing import Any, Self
 
 import jwt
 from fastapi import Request
@@ -39,7 +39,7 @@ class OidcAuthenticator:
         self._key_for_token = key_for_token
 
     @classmethod
-    def from_settings(cls, settings: Settings) -> "OidcAuthenticator":
+    def from_settings(cls, settings: Settings) -> Self:
         """Fetch signing keys from OIDC_JWKS_URL lazily, on the first request that needs one."""
         client = jwt.PyJWKClient(settings.OIDC_JWKS_URL) if settings.OIDC_JWKS_URL else None
 

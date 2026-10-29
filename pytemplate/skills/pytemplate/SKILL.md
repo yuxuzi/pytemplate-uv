@@ -61,7 +61,7 @@ Ask only for what you cannot infer, in one short message:
 - **description**: one line, with no double quotes or backslashes.
 - **author** and **email**: ask; never invent personal details. If the user declines, keep the
   template defaults and tell them.
-- **python_version**: the minimum, 3.11–3.14 (default 3.11).
+- **python_version**: the minimum, 3.11–3.15 (default 3.11).
 - **license**: an SPDX expression (default MIT).
 - **output directory**: an existing parent directory (default: the current directory).
 

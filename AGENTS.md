@@ -14,7 +14,7 @@ uv-native projects. A project is built from:
 - optionally, an external **template pack**.
 
 It can also upgrade those projects later with `copier update`. It is published to PyPI as
-`pytemplate-uv` and supports CPython 3.11–3.14 on Windows, macOS, and Linux. `uv` and `uvx` are
+`pytemplate-uv` and supports CPython 3.11–3.15 on Windows, macOS, and Linux. `uv` and `uvx` are
 the only required tools; never use pip, virtualenv activation, or make. The roadmap is
 [PLAN.md](PLAN.md), and the versioning rules are in
 [docs/compatibility.md](docs/compatibility.md).
@@ -59,8 +59,9 @@ template change, also run the smoke tests. Report the real results.
   - `questions.yml`: shared settings and questions;
   - `copier.yml`: bundled entry point;
   - `<profile>/profile.toml`: the profile manifest;
-  - `<profile>/template/`: the project tree. Only `*.jinja` files are rendered. Component files use
-    conditional names such as `{% if 'database' in components %}migrations{% endif %}`.
+  - `<profile>/template/`: the project tree. Only `*.jinja` files are rendered. Component files have
+    plain names. The renderer excludes the `paths` of unselected components, so never put
+    `{% if %}` conditions in file names; that would also break Windows' path-length limit.
 - `pytemplate/components/<id>.toml`: component manifests.
 - `copier.yml` (repo root): the git entry point that `copier update` uses at `vX.Y.Z` tags.
 - `tests/`:

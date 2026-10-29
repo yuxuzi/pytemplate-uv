@@ -179,3 +179,40 @@ def test_template_validators_reject_unsafe_answers(data: dict[str, str], tmp_pat
     with pytest.raises(RequestError, match="Copier rejected the answers"):
         _render("python", tmp_path, data=data)
     assert list(tmp_path.iterdir()) == []
+
+
+def test_template_paths_stay_short_enough_for_windows() -> None:
+    """Keep template paths well under Windows' default 260-character limit.
+
+    Templates are read from deep locations: site-packages, uv caches, Copier's temporary clones,
+    and pytest's tmp_path.
+    """
+    root = SOURCE_ROOT / "templates"
+    longest = max(
+        (path.relative_to(root.parent.parent).as_posix() for path in root.rglob("*")),
+        key=len,
+    )
+
+    assert len(longest) <= 110, longest
+
+
+def test_template_file_names_have_no_component_conditions() -> None:
+    """Component files are excluded through their manifest `paths`, not conditional names."""
+    root = SOURCE_ROOT / "templates"
+
+    assert not [path for path in root.rglob("*") if "{%" in path.name]
+
+
+def test_only_directories_emptied_by_exclusions_are_removed(tmp_path: Path) -> None:
+    for name in ("pkg/security", "migrations/versions", "user/empty", "pkg/kept"):
+        (tmp_path / name).mkdir(parents=True)
+    (tmp_path / "pkg" / "kept" / "module.py").write_text("", encoding="utf-8")
+
+    rendering.remove_excluded_directories(
+        tmp_path, ["pkg/security/api_key.py", "migrations/**", "pkg/kept/*.py"]
+    )
+
+    assert not (tmp_path / "pkg" / "security").exists()
+    assert not (tmp_path / "migrations").exists()
+    assert (tmp_path / "user" / "empty").is_dir()
+    assert (tmp_path / "pkg" / "kept" / "module.py").is_file()

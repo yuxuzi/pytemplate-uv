@@ -1,5 +1,7 @@
 """Background job endpoints: submit returns 202 at once; poll the job for its result."""
 
+from typing import Self
+
 from fastapi import APIRouter, status
 from pydantic import BaseModel
 
@@ -21,7 +23,7 @@ class JobRead(BaseModel):
     error: str | None
 
     @classmethod
-    def from_job(cls, job: Job) -> "JobRead":
+    def from_job(cls, job: Job) -> Self:
         """Convert a job into its public representation."""
         return cls(id=job.id, name=job.name, state=job.state, result=job.result, error=job.error)
 

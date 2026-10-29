@@ -37,10 +37,13 @@ Three gaps remain:
 - **The contract is versioned separately from releases.** `contract = 1` covers the
   profile/component/pack manifest format. A breaking change to the format raises the contract
   number. Profile and component `version`s change whenever their generated output changes.
-- **Composition stays inside Copier.** Component files live in the compatible profile's tree
-  behind conditional path names, and a `components` multiselect question is stored in
-  `.copier-answers.yml`, so `copier update` keeps working. A test checks the manifests against the
-  rendered output. There is no second merge engine.
+- **Composition stays inside Copier.** Component files have plain names in the compatible
+  profile's tree. The renderer and `pytemplate update` pass the `paths` of unselected components
+  to Copier as `exclude`, so the manifests are the only record of which files a component owns.
+  A `components` multiselect question is stored in `.copier-answers.yml`, so updates keep the same
+  selection. A test checks the manifests against the rendered output, and there is no second
+  merge engine. Conditional file names were tried first, but they pushed template paths past
+  Windows' 260-character limit in CI.
 - **Packs are explicit, never discovered.** They are selected by path or git ref on each request,
   with no entry points or scanning. They render under the same rules: `unsafe=False`, and no
   `_tasks`, `_migrations`, or `_jinja_extensions`.
@@ -62,7 +65,7 @@ Three gaps remain:
 | `id`, `name`, `description`, `version`, `aliases` | As today |
 | `kind` | `library`, `cli`, or `service` |
 | `status` | `stable` or `experimental` |
-| `supported_python` | CPython minors, 3.11–3.14 |
+| `supported_python` | CPython minors, 3.11–3.15 |
 | `default_components`, `optional_components` | What is always included and what may be added |
 | `dependencies`, `dependency_groups` | The profile's own runtime requirements and PEP 735 groups (for example `dev`) |
 | `questions` | The subset of `questions.yml` this profile asks |
@@ -182,7 +185,7 @@ It contains:
   `tests/test_composition.py` enforces this.
 - A pack fixture renders through `--template`, is recorded in the manifest, and is rejected if it
   declares `_tasks`, `_migrations`, or `_jinja_extensions`.
-- The generator, manifest, and contract tests pass on CPython 3.11–3.14 on Linux, Windows, and
+- The generator, manifest, and contract tests pass on CPython 3.11–3.15 on Linux, Windows, and
   macOS.
 
 ## 4. Phase 3.2: FastAPI service foundation
@@ -288,8 +291,9 @@ authentication, for local or internal prototypes.
        and `load_catalog()`; slug ids; manifests for every component.
 - [x] 2. `resolve()` and `Resolution` in `resolution.py`: `requires`, `requires_any`, and
        `conflicts`; merged dependencies; path ownership through `owner()`.
-- [x] 3. A `components` multiselect question, stored in the answers file; conditional paths in
-       templates; `tests/test_composition.py` over every distinct component set.
+- [x] 3. A `components` multiselect question, stored in the answers file; files of unselected
+       components excluded through their manifest `paths`; `tests/test_composition.py` over
+       every distinct component set.
 - [x] 4. Manifest schema 2 (template source, component reasons, answers, file owners). `update`
        reads v1 manifests and maps legacy components through the profile's
        `legacy_components`.
@@ -329,7 +333,7 @@ authentication, for local or internal prototypes.
 - [x] 12. Smoke tests run every distinct component set (26), with a 41-character project name.
 - [x] 13. README, `AGENTS.md`, `SKILL.md`, and the CHANGELOG (3.0.0, which includes the unreleased
         2.1 work).
-- [x] 14. CI: the smoke matrix split by profile (Linux and Windows × 3.11 and 3.14), and a wheel
+- [x] 14. CI: the smoke matrix split by profile (Linux and Windows × 3.11 and 3.15), and a wheel
         job that inspects, plans, and creates every profile and component.
 - [x] 15. Version bumped to 3.0.0 and `uv.lock` refreshed.
 - [ ] 16. Maintainer only:
@@ -354,6 +358,11 @@ authentication, for local or internal prototypes.
 | Pack rendering | `tests/test_packs.py` | directory and git-tag packs render and are recorded; `_tasks`, `_migrations`, `_jinja_extensions`, and symlinks are rejected |
 | No consumer coupling | `uv tree --no-dev --depth 1`; grep for QuantAgentOS | copier, rich, and typer only; no mention in code or docs |
 | Distribution | `uv build`, `uvx twine check --strict dist/*`, and the CI wheel script run locally | PASSED; four wheel-generated projects with the expected files |
+
+Follow-up (PR #5, 2026-10-29):
+- the Sourcery review findings on `update` are fixed, each with a regression test;
+- CPython 3.15 is supported: the generator suite passes on 3.15.2 (307 passed), and all 26
+  combinations pass with `python_version=3.15` on 3.15.2 and with the 3.11 default.
 
 Not verified locally:
 - the Windows and Linux CI runners;

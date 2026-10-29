@@ -24,7 +24,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        python-version: ["3.11", "3.12", "3.13", "3.14", "3.15"]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -41,12 +41,13 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        python-version: ["3.11", "3.14"]
+        python-version: ["3.11", "3.15"]
         profile: [python, fastapi]
     runs-on: ${{ matrix.os }}
     env:
       PYTEMPLATE_SMOKE: "1"
       PYTEMPLATE_SMOKE_PROFILE: ${{ matrix.profile }}
+      PYTEMPLATE_SMOKE_PYTHON: ${{ matrix.python-version }}
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.3.2

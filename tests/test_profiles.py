@@ -21,7 +21,7 @@ from pytemplate.profiles import (
 def test_profiles_declare_supported_python_and_default_components() -> None:
     profile = get_profile("fastapi")
 
-    assert profile.supported_python == ("3.11", "3.12", "3.13", "3.14")
+    assert profile.supported_python == ("3.11", "3.12", "3.13", "3.14", "3.15")
     assert profile.default_components == ("api",)
 
 

@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, replace
 from datetime import datetime
+from typing import Self
 
 from .errors import InvalidValueError
 
@@ -49,7 +50,7 @@ class Example:
     created_at: datetime
     updated_at: datetime | None = None
 
-    def apply(self, changes: ExampleChanges, now: datetime) -> "Example":
+    def apply(self, changes: ExampleChanges, now: datetime) -> Self:
         """Return a copy with the given changes and a new `updated_at`."""
         if changes.name is not None:
             _check_name(changes.name)

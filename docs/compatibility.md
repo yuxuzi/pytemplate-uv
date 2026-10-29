@@ -42,7 +42,7 @@ format.
      in CI.
    - Upgrading a dependency is the project's decision.
 7. **Supported Python versions.**
-   - The generator and every stable profile support each CPython minor release from 3.11 to 3.14.
+   - The generator and every stable profile support each CPython minor release from 3.11 to 3.15.
    - Raising the minimum version is a major-release decision.
 
 ## Status levels
@@ -62,6 +62,9 @@ format.
     sanitized answers, and a hash and owner for every generated file.
 - `pytemplate update` is a dry run unless `--apply` is given, and it requires a clean git tree.
   Conflicts are marked inline and never resolved silently.
+- `update` keeps a project's recorded components. It excludes the files of unselected
+  components exactly as `create` does, and does not add or remove components. To change them,
+  generate a new project and move your code over.
 - **Projects from 2.0** have no answers file and cannot be updated; regenerate them with 3.0.
 - **Projects from 2.1 development builds** never recorded their components.
   - `pytemplate update` keeps everything such a project already had: the components in its

@@ -1,6 +1,7 @@
 """Request and response bodies; they are separate from the domain model on purpose."""
 
 from datetime import datetime
+from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -40,7 +41,7 @@ class ExampleRead(BaseModel):
     updated_at: datetime | None
 
     @classmethod
-    def from_domain(cls, example: Example) -> "ExampleRead":
+    def from_domain(cls, example: Example) -> Self:
         """Convert a domain entity into its public representation."""
         return cls(
             id=example.id,
