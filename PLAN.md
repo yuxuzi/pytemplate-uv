@@ -6,8 +6,8 @@ deterministic application factory built from three parts:
 - composable components, which add narrow capabilities;
 - explicitly selected external template packs.
 
-The Phase 2 record (Copier migration, green generated projects, `copier update`) is archived in
-[docs/plans/phase-2.md](docs/plans/phase-2.md).
+The Phase 2 record (Copier migration, green generated projects, `copier update`) is in the git
+history and the 2.x CHANGELOG entries.
 
 Status key: `[x]` done and verified, `[ ]` open.
 

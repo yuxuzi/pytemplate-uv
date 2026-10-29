@@ -5,19 +5,19 @@
 [![CI](https://github.com/yuxuzi/pytemplate-uv/actions/workflows/ci.yml/badge.svg)](https://github.com/yuxuzi/pytemplate-uv/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-> **Generate production-ready Python projects in seconds.** Deterministic application factory with
-> professions, composable components, and zero configuration.
+> **Generate production-ready Python projects in seconds.** A deterministic application factory
+> with profiles, composable components, and template packs.
 
 A modern application factory that generates **uv-native** Python projects that pass linting,
-formatting, type-checking, and tests from the first commit. Choose your profile (library, CLI
-tool, or FastAPI service), add components (database, authentication, background jobs), and get a
+formatting, type-checking, and tests from the first commit. Choose a profile (a typed package
+with a CLI, or a FastAPI service), add components (database, authentication, background jobs), and get a
 ready-to-deploy project.
 
 - ✅ **Deterministic:** identical requests produce byte-identical projects
 - ✅ **Production-ready:** every component combination passes strict quality gates
-- ✅ **Fast:** minimal dependencies, `uv`-only (no pip, virtualenv, or make)
+- ✅ **uv-native:** generated projects need only `uv` and `uvx` (no pip, virtualenv activation, or make)
 - ✅ **Extensible:** use template packs to customize without forking
-- ✅ **Type-safe:** strict mypy on generated code, validated inputs
+- ✅ **Type-safe:** strict mypy on generated code; requests are validated before anything is written
 
 ## What you get
 
@@ -31,7 +31,7 @@ ready-to-deploy project.
 | Component | Purpose | When to use |
 | --- | --- | --- |
 | `database` | SQLAlchemy 2.x ORM + Alembic migrations | When you need persistent data |
-| `worker` | Background job queue with in-process adapter | For async work and scheduled tasks |
+| `worker` | A task-queue port with an in-process adapter and job endpoints | For background work |
 | `auth-api-key` | API key authentication with scopes | For service-to-service auth |
 | `auth-oidc` | OpenID Connect (JWT) authentication | For user login via identity provider |
 | `container` | Dockerfile and `.dockerignore` | For containerized deployment |
@@ -63,16 +63,18 @@ This is verified across 26 component combinations on every commit.
 - Generated code is usually messy, missing checks, and needs cleanup
 
 **The solution:**
-- Start with patterns that actually work in production
-- All combinations validated and tested (26 component mixes on every commit)
-- Updated safely with `pytemplate update`—no merge conflicts, your changes preserved
-- Write less, deploy faster, fewer bugs
+- Start from reviewed patterns: layered architecture, health checks, structured logs, auth
+  behind a principal and scopes
+- Every component combination is generated and checked in CI (26 combinations, Linux, macOS,
+  and Windows)
+- Pull in later template releases with `pytemplate update`: a three-way merge that keeps your
+  edits and marks real conflicts inline
+- Script it: the same request always produces the same project
 
-**Who uses it:**
-- Teams building FastAPI services and CLI tools
-- Projects that need deterministic scaffolding in CI/CD
-- Any shop that generates variations of the same app
-- Organizations building internal tools and platforms
+**Good fit for:**
+- Teams starting FastAPI services or typed CLI tools
+- Platforms that generate many similar apps from one reviewed template
+- CI pipelines and AI agents that need a scriptable, validated scaffolding step
 
 ## Install
 
@@ -99,8 +101,8 @@ uv sync
 uv run pytest
 ```
 
-That's it. You have a production-grade FastAPI service with a database, OIDC auth, tests, CI/CD,
-structured logging, health checks, and a clean layered architecture.
+That's it: a layered FastAPI service with a database, OIDC authentication, tests, a GitHub
+Actions workflow, structured logging, and health checks.
 
 ### More examples
 
@@ -115,10 +117,11 @@ pytemplate create my-service -p fastapi -c worker -c database --no-input
 pytemplate create my-api -p fastapi -c auth-api-key -c container --no-input
 
 # Preview before writing anything
-pytemplate plan -p fastapi -c database -c auth-oidc --name my-api
+pytemplate plan --name my-api -p fastapi -c database -c auth-oidc
 
 # Validate a request (catches mistakes early)
-pytemplate validate -p fastapi -c auth    # Error: 'auth' requires one of: auth-api-key, auth-oidc
+pytemplate validate --name my-api -p fastapi -c auth
+# Error: Component 'auth' needs one of: auth-api-key, auth-oidc; add --component auth-api-key.
 ```
 
 `create-project` is an optional shortcut with the same arguments and options as
@@ -136,15 +139,16 @@ uvx --from pytemplate-uv create-project pricing-api -p fastapi --no-input
 | `plan` | Preview files and dependencies (no write) |
 | `validate` | Check for errors before rendering |
 | `create-from-config FILE` | Render from a TOML request file |
-| `list-profiles` | Show available profiles |
-| `list-components` | Show available components and their requirements |
-| `update [DIR]` | Merge a new template release into an existing project |
-| `schema` | Print JSON Schemas for integration with tools and scripts |
+| `list-profiles` / `describe-profile ID` | Show profiles and their inputs |
+| `list-components` / `describe-component ID` | Show components: requirements, conflicts, dependencies, files, settings |
+| `update [DIR]` | Merge a newer template release into an existing project (dry run unless `--apply`) |
+| `schema NAME` | Print a JSON Schema (`profile`, `component`, `pack`, `request`, `manifest`) |
+| `skill install` / `skill show` | Install or print the AI project-creation skill |
 
 **Tips:**
-- All commands support `--json` for scripting and CI/CD
-- Use `--template` to render from custom template packs
-- `plan` and `update` never write to disk (preview first, then `--apply`)
+- Every command except `update` and `skill` accepts `--json`
+- Use `--template` to render from your own template pack
+- `plan`, `validate`, and `update` without `--apply` write nothing
 
 **Exit codes:**
 - `0`: success.
@@ -265,10 +269,10 @@ from pathlib import Path
 from pytemplate import api
 
 # Plan without writing
-request = api.RenderRequest("fastapi", "my-api", Path("."), components=("database",))
+request = api.RenderRequest("fastapi", "my-api", Path("."), components=("database",), no_input=True)
 plan = api.plan(request)
-print(plan.dependencies)   # inspect what will be added
-print(plan.files)          # see all generated files
+print(plan.resolution.dependencies)  # what will be added
+print(plan.files)  # every generated file
 
 # Or render the project
 api.render(request)
@@ -280,7 +284,7 @@ api.render(request)
 pytemplate plan --name my-api -p fastapi -c database --json | jq .
 
 # Validate requests before rendering
-pytemplate validate --config request.toml --json
+pytemplate validate request.toml --json
 
 # Get schemas for validation
 pytemplate schema request
@@ -317,16 +321,16 @@ uv run mypy
 
 **Adding a component:**
 1. Create `pytemplate/components/my-component.toml` with the manifest
-2. Add files to `pytemplate/templates/fastapi/template/` with conditional includes
-3. Add questions to `pytemplate/templates/questions.yml`
-4. Tests run automatically for all combinations
+2. Add its files to the compatible profile's `template/` tree and list them in the manifest's
+   `paths`
+3. Add its id to the `components` choices in `pytemplate/templates/questions.yml`
+4. The composition tests render every combination automatically
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 
 ## Learn more
 
 - [Compatibility & versioning](docs/compatibility.md)
-- [Design decisions](docs/decisions/)
 - [CHANGELOG](CHANGELOG.md)
 - For AI agents: [AGENTS.md](AGENTS.md)
 - For project scaffolding in Claude: `pytemplate skill install`
@@ -334,8 +338,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 ## FAQ
 
 **Can I use this in production?**
-Yes. Every generated component combination passes strict tests (lint, format, type-check, pytest)
-on every commit. The `stable` components are production-ready.
+The generated code is a starting point you own. Every `stable` component combination passes lint,
+format, strict type-checking, and its tests in CI, and `SECURITY.md` lists what you still need to
+configure for deployment.
 
 **What if I want to customize the templates?**
 Use `--template` to point to your own template pack (a directory or git repo). You get all the
@@ -343,7 +348,8 @@ composition logic but with your own code.
 
 **How do I keep my project updated?**
 Run `pytemplate update`. It does a three-way merge that keeps your edits and merges in new
-template improvements. Projects generated by 3.0+ support updates forever.
+template improvements; real conflicts are marked inline for you to resolve. Projects generated
+by 3.0 or later can be updated.
 
 **Do I need to commit the generated code?**
 Yes—generate the project into a git repo and commit it. `.pytemplate.toml` records how it was
@@ -356,11 +362,12 @@ Yes, intentionally. We have opinions on:
 - Layered architecture (domain, application, infrastructure)
 - Type safety (strict mypy by default)
 
-These opinions come from production experience and are documented in `CLAUDE.md`.
+Each generated project's `README.md` and `CLAUDE.md` describe its layout and conventions.
 
 **Can I generate projects without a network connection?**
-Yes. The generator doesn't touch the network or load your environment. Copier runs with
-`unsafe=False`, so templates can't execute code.
+Yes, with the bundled templates: rendering never touches the network or reads your environment,
+and Copier runs with `unsafe=False`, so templates can't execute code. Git template packs,
+`pytemplate update`, and the generated project's `uv sync` need network access.
 
 ## License
 

@@ -77,7 +77,7 @@ template change, also run the smoke tests. Report the real results.
 - **No consumer coupling:** this is a generic factory. Never import, depend on, or name a
   downstream framework or product in code, templates, or dependencies. Downstream
   projects call the CLI or `pytemplate.api` and ship their own profiles as template packs. The
-  current roadmap is [PLAN.md](PLAN.md); earlier phases are in [docs/plans/](docs/plans/).
+  current roadmap is [PLAN.md](PLAN.md).
 - **Deterministic rendering:** no environment variables, clock values, or network access in the
   template context. Identical requests produce byte-identical projects.
 - **Safe templates:** never add Copier `_tasks` or `_migrations`, and keep `unsafe=False`.
