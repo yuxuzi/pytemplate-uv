@@ -1,9 +1,15 @@
 """Shared fixtures."""
 
+import os
 from pathlib import Path
 from textwrap import dedent
 
 import pytest
+
+# Rich wraps CLI output to the terminal width, so a phrase can split wherever a long temporary
+# path happens to end. Render wide so text assertions never depend on the machine. This runs
+# before any test module imports the CLI, whose console reads COLUMNS when it is created.
+os.environ["COLUMNS"] = "1000"
 
 ANSWERS_TEMPLATE = "{{ _copier_answers|to_nice_yaml -}}\n"
 
@@ -66,9 +72,7 @@ def write_pack(root: Path) -> Path:
         """,
         "tool/template/README.md.jinja": "# {{ project_name }}\n\n{{ description }}\n",
         "tool/template/{{ package_name }}/__init__.py": "",
-        "tool/template/{{ package_name }}/{% if 'extra' in components %}extra.py{% endif %}": (
-            "VALUE = 1\n"
-        ),
+        "tool/template/{{ package_name }}/extra.py": "VALUE = 1\n",
         "tool/template/{{ _copier_conf.answers_file }}.jinja": ANSWERS_TEMPLATE,
     }
     for name, content in files.items():

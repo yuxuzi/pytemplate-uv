@@ -37,10 +37,13 @@ Three gaps remain:
 - **The contract is versioned separately from releases.** `contract = 1` covers the
   profile/component/pack manifest format. A breaking change to the format raises the contract
   number. Profile and component `version`s change whenever their generated output changes.
-- **Composition stays inside Copier.** Component files live in the compatible profile's tree
-  behind conditional path names, and a `components` multiselect question is stored in
-  `.copier-answers.yml`, so `copier update` keeps working. A test checks the manifests against the
-  rendered output. There is no second merge engine.
+- **Composition stays inside Copier.** Component files have plain names in the compatible
+  profile's tree. The renderer and `pytemplate update` pass the `paths` of unselected components
+  to Copier as `exclude`, so the manifests are the only record of which files a component owns.
+  A `components` multiselect question is stored in `.copier-answers.yml`, so updates keep the same
+  selection. A test checks the manifests against the rendered output, and there is no second
+  merge engine. Conditional file names were tried first, but they pushed template paths past
+  Windows' 260-character limit in CI.
 - **Packs are explicit, never discovered.** They are selected by path or git ref on each request,
   with no entry points or scanning. They render under the same rules: `unsafe=False`, and no
   `_tasks`, `_migrations`, or `_jinja_extensions`.
@@ -288,8 +291,9 @@ authentication, for local or internal prototypes.
        and `load_catalog()`; slug ids; manifests for every component.
 - [x] 2. `resolve()` and `Resolution` in `resolution.py`: `requires`, `requires_any`, and
        `conflicts`; merged dependencies; path ownership through `owner()`.
-- [x] 3. A `components` multiselect question, stored in the answers file; conditional paths in
-       templates; `tests/test_composition.py` over every distinct component set.
+- [x] 3. A `components` multiselect question, stored in the answers file; files of unselected
+       components excluded through their manifest `paths`; `tests/test_composition.py` over
+       every distinct component set.
 - [x] 4. Manifest schema 2 (template source, component reasons, answers, file owners). `update`
        reads v1 manifests and maps legacy components through the profile's
        `legacy_components`.

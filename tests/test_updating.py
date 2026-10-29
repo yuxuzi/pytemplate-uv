@@ -169,14 +169,16 @@ def test_git_entry_point_renders_the_same_files_as_the_bundled_one(
         )
     ).project_path
     from_git = tmp_path / "from-git"
+    resolution = resolve(get_profile(profile_id))
     run_copy(
         str(template_source),
         from_git,
         data={
             "profile": profile_id,
             "project_name": "demo-app",
-            "components": list(resolve(get_profile(profile_id)).component_ids),
+            "components": list(resolution.component_ids),
         },
+        exclude=resolution.exclude_patterns("demo_app"),
         vcs_ref=f"v{generator_version()}",
         defaults=True,
         quiet=True,
@@ -213,8 +215,22 @@ def test_no_template_file_is_ignored_by_git() -> None:
 
 
 def test_update_keeps_the_components_of_a_project_generated_before_3_0(
-    project: Path, template_source: Path
+    tmp_path: Path, template_source: Path
 ) -> None:
+    # A 2.1 development build always rendered a Dockerfile but recorded no components.
+    output = tmp_path / "legacy"
+    output.mkdir()
+    project = render(
+        RenderRequest(
+            profile_id="python",
+            project_name="demo-app",
+            output_dir=output,
+            components=("container",),
+            no_input=True,
+            template_source=str(template_source),
+        )
+    ).project_path
+    _git(project, "init", "-q")
     answers_path = project / ".copier-answers.yml"
     answers = yaml.safe_load(answers_path.read_text(encoding="utf-8"))
     del answers["components"]
@@ -242,3 +258,15 @@ def test_update_keeps_the_components_of_a_project_generated_before_3_0(
         "source": str(template_source),
         "ref": "v99.0.0",
     }
+
+
+def test_update_does_not_add_files_of_unselected_components(
+    project: Path, template_source: Path
+) -> None:
+    _release_new_template(template_source)
+
+    update(UpdateRequest(project, to_ref="v99.0.0", apply=True))
+
+    assert NEW_README_LINE in (project / "README.md").read_text(encoding="utf-8")
+    assert not (project / "Dockerfile").exists()
+    assert not (project / ".dockerignore").exists()

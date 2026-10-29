@@ -38,9 +38,10 @@ PYTEMPLATE_SMOKE=1 PYTEMPLATE_SMOKE_PROFILE=fastapi uv run pytest tests/test_gen
 
 1. Write `pytemplate/components/<id>.toml` (`pytemplate schema component`). Declare its
    `requires`, `conflicts`, dependencies, owned `paths`, `settings`, and `security_notes`.
-2. Add its files to each compatible profile tree, behind conditional names such as
-   `{% if '<id>' in components %}name{% endif %}`. Use `{% if %}` blocks only inside files the
-   profile or another component owns.
+2. Add its files, with plain names, to each compatible profile tree, and list them in the
+   manifest's `paths`. Files of unselected components are excluded automatically. Use
+   `{% if '<id>' in components %}` blocks only inside files the profile or another component
+   owns.
 3. Add its dependencies to the profile's `pyproject.toml.jinja` and its settings to
    `.env.example.jinja`.
 4. Add `<id>` to the `components` choices in `questions.yml` and to `optional_components` in each

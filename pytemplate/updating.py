@@ -18,6 +18,7 @@ from pytemplate.rendering import (
     ANSWERS_FILE,
     MANIFEST_FILE,
     generator_version,
+    remove_empty_directories,
     write_generation_manifest,
 )
 from pytemplate.resolution import Resolution, resolve
@@ -162,6 +163,31 @@ def _refresh_manifest(project_path: Path, source: TemplateSource, to_ref: str) -
         )
 
 
+def _update_inputs(
+    answers: dict[str, object],
+    manifest: dict[str, object],
+    source: TemplateSource,
+    to_ref: str,
+) -> tuple[dict[str, object], list[str]]:
+    """Return Copier data overrides and the paths of unselected components to exclude."""
+    data: dict[str, object] = {}
+    pack = None if source.is_bundled else source.location
+    with open_catalog(pack, to_ref if pack else None) as (catalog, _, _):
+        recorded = manifest.get("profile")
+        profile_id = answers.get("profile") or (
+            recorded.get("id") if isinstance(recorded, dict) else None
+        )
+        profile = catalog.profile(str(profile_id))
+        components = answers.get("components")
+        if not isinstance(components, list):
+            # Projects from 2.1 development builds never recorded components; keep them all.
+            components = _legacy_components(profile, manifest)
+            data["components"] = components
+        resolution = _resolution_for(catalog, profile, [str(item) for item in components])
+    package = str(answers.get("package_name", ""))
+    return data, resolution.exclude_patterns(package)
+
+
 def update(request: UpdateRequest) -> UpdateResult:
     """Preview or apply a template update; user edits are kept and conflicts marked inline."""
     project_path = request.project_dir.expanduser().resolve()
@@ -182,12 +208,7 @@ def update(request: UpdateRequest) -> UpdateResult:
     if request.to_ref is None and version == "uninstalled":
         raise UpdateError("Cannot infer the target version from a source checkout; pass --to.")
     from_ref = answers.get("_commit")
-    data: dict[str, object] = {}
-    if "components" not in answers and source.is_bundled and manifest:
-        # Projects from 2.x never recorded components; keep everything they contain.
-        with open_catalog() as (catalog, _, _):
-            profile = catalog.profile(str(manifest["profile"]["id"]))  # type: ignore[index]
-        data["components"] = _legacy_components(profile, manifest)
+    data, exclude = _update_inputs(answers, manifest, source, to_ref)
 
     try:
         run_update(
@@ -201,11 +222,13 @@ def update(request: UpdateRequest) -> UpdateResult:
             quiet=request.apply,
             unsafe=False,
             data=data,
+            exclude=exclude,
         )
     except (CopierError, ValueError, subprocess.CalledProcessError) as error:
         raise UpdateError(f"Copier could not update {project_path}: {error}") from error
 
     if request.apply:
+        remove_empty_directories(project_path)
         _refresh_manifest(project_path, source, to_ref)
     return UpdateResult(
         project_path=project_path,

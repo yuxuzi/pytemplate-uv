@@ -34,9 +34,15 @@ class Resolution:
     dependencies: tuple[str, ...] = ()
     dependency_groups: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     paths: tuple[str, ...] = ()
+    # Paths owned by this profile's unselected components; rendering leaves them out.
+    excluded_paths: tuple[str, ...] = ()
     settings: tuple[Setting, ...] = ()
     lifecycle_commands: tuple[str, ...] = ()
     security_notes: tuple[str, ...] = ()
+
+    def exclude_patterns(self, package: str) -> list[str]:
+        """Return Copier `exclude` patterns (rendered paths) for the unselected components."""
+        return [pattern.replace("{package}", package) for pattern in self.excluded_paths]
 
     @property
     def component_ids(self) -> tuple[str, ...]:
@@ -207,6 +213,12 @@ def resolve(
             group: _requirements([specs]) for group, specs in sorted(groups.items())
         },
         paths=_unique(path for component in components for path in component.paths),
+        excluded_paths=_unique(
+            path
+            for identifier in profile.components
+            if identifier not in selected and identifier in catalog
+            for path in catalog[identifier].paths
+        ),
         settings=_merged_settings(components),
         lifecycle_commands=_unique(
             [

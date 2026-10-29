@@ -36,6 +36,7 @@ __all__ = [
     "RequestError",
     "generator_version",
     "plan",
+    "remove_empty_directories",
     "render",
     "validate_request",
     "write_generation_manifest",
@@ -325,6 +326,13 @@ def _record_template_source(project_path: Path, location: str, ref: str | None) 
     )
 
 
+def remove_empty_directories(root: Path) -> None:
+    """Delete directories left empty because every file in them was excluded."""
+    for path in sorted(root.rglob("*"), key=lambda item: len(item.parts), reverse=True):
+        if path.is_dir() and not path.is_symlink() and not any(path.iterdir()):
+            path.rmdir()
+
+
 def _remove(path: Path) -> None:
     if path.is_dir() and not path.is_symlink():
         shutil.rmtree(path)
@@ -366,6 +374,7 @@ def _render_into(
             defaults=request.no_input,
             quiet=True,
             unsafe=False,
+            exclude=resolution.exclude_patterns(_package_name(request)),
         )
     except ValueError as error:
         raise RequestError(
@@ -382,6 +391,7 @@ def _render_into(
             "`{{ _copier_answers|to_nice_yaml }}` to its template."
         )
     _record_template_source(destination, source.location, source.ref)
+    remove_empty_directories(destination)
     return write_generation_manifest(destination, resolution, source)
 
 

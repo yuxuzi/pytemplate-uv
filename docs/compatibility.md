@@ -62,6 +62,9 @@ format.
     sanitized answers, and a hash and owner for every generated file.
 - `pytemplate update` is a dry run unless `--apply` is given, and it requires a clean git tree.
   Conflicts are marked inline and never resolved silently.
+- `update` keeps a project's recorded components. It excludes the files of unselected
+  components exactly as `create` does, and does not add or remove components. To change them,
+  generate a new project and move your code over.
 - **Projects from 2.0** have no answers file and cannot be updated; regenerate them with 3.0.
 - **Projects from 2.1 development builds** never recorded their components.
   - `pytemplate update` keeps everything such a project already had: the components in its
