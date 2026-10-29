@@ -201,3 +201,18 @@ def test_template_file_names_have_no_component_conditions() -> None:
     root = SOURCE_ROOT / "templates"
 
     assert not [path for path in root.rglob("*") if "{%" in path.name]
+
+
+def test_only_directories_emptied_by_exclusions_are_removed(tmp_path: Path) -> None:
+    for name in ("pkg/security", "migrations/versions", "user/empty", "pkg/kept"):
+        (tmp_path / name).mkdir(parents=True)
+    (tmp_path / "pkg" / "kept" / "module.py").write_text("", encoding="utf-8")
+
+    rendering.remove_excluded_directories(
+        tmp_path, ["pkg/security/api_key.py", "migrations/**", "pkg/kept/*.py"]
+    )
+
+    assert not (tmp_path / "pkg" / "security").exists()
+    assert not (tmp_path / "migrations").exists()
+    assert (tmp_path / "user" / "empty").is_dir()
+    assert (tmp_path / "pkg" / "kept" / "module.py").is_file()

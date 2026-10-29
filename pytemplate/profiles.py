@@ -19,7 +19,7 @@ PROFILE_STATUSES = ("stable", "experimental")
 # A planned component is described for discovery but cannot be selected yet.
 COMPONENT_STATUSES = ("stable", "experimental", "planned")
 SETTING_TYPES = ("str", "int", "bool", "list")
-DEFAULT_PYTHON = ("3.11", "3.12", "3.13", "3.14")
+DEFAULT_PYTHON = ("3.11", "3.12", "3.13", "3.14", "3.15")
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9-]*$")
 # Questions answered by pytemplate itself from the request, never through --data.
 RESERVED_QUESTIONS = ("profile", "components")

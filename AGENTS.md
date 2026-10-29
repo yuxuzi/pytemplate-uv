@@ -14,7 +14,7 @@ uv-native projects. A project is built from:
 - optionally, an external **template pack**.
 
 It can also upgrade those projects later with `copier update`. It is published to PyPI as
-`pytemplate-uv` and supports CPython 3.11–3.14 on Windows, macOS, and Linux. `uv` and `uvx` are
+`pytemplate-uv` and supports CPython 3.11–3.15 on Windows, macOS, and Linux. `uv` and `uvx` are
 the only required tools; never use pip, virtualenv activation, or make. The roadmap is
 [PLAN.md](PLAN.md), and the versioning rules are in
 [docs/compatibility.md](docs/compatibility.md).

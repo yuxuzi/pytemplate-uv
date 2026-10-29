@@ -36,7 +36,7 @@ __all__ = [
     "RequestError",
     "generator_version",
     "plan",
-    "remove_empty_directories",
+    "remove_excluded_directories",
     "render",
     "validate_request",
     "write_generation_manifest",
@@ -326,9 +326,26 @@ def _record_template_source(project_path: Path, location: str, ref: str | None) 
     )
 
 
-def remove_empty_directories(root: Path) -> None:
-    """Delete directories left empty because every file in them was excluded."""
-    for path in sorted(root.rglob("*"), key=lambda item: len(item.parts), reverse=True):
+def remove_excluded_directories(root: Path, patterns: Sequence[str]) -> None:
+    """Delete the directories that ``patterns`` emptied; Copier still creates them.
+
+    Only directories on the literal path of an exclusion pattern, plus the subtree a glob
+    pattern owns, are candidates. Empty directories elsewhere in a project are never touched, and
+    the project is not scanned.
+    """
+    candidates: set[Path] = set()
+    for pattern in patterns:
+        literal = re.split(r"[*?\[]", pattern, maxsplit=1)[0].rstrip("/")
+        if not literal:
+            continue
+        path = root / literal
+        if literal != pattern and path.is_dir():
+            # A glob such as `migrations/**` owns the whole subtree below its literal prefix.
+            candidates.update(item for item in path.rglob("*") if item.is_dir())
+        while path != root and root in path.parents:
+            candidates.add(path)
+            path = path.parent
+    for path in sorted(candidates, key=lambda item: len(item.parts), reverse=True):
         if path.is_dir() and not path.is_symlink() and not any(path.iterdir()):
             path.rmdir()
 
@@ -391,7 +408,7 @@ def _render_into(
             "`{{ _copier_answers|to_nice_yaml }}` to its template."
         )
     _record_template_source(destination, source.location, source.ref)
-    remove_empty_directories(destination)
+    remove_excluded_directories(destination, resolution.exclude_patterns(_package_name(request)))
     return write_generation_manifest(destination, resolution, source)
 
 

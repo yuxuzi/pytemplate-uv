@@ -70,6 +70,27 @@ deprecation rules that now apply.
 ### Changed
 
 - The bundled skill discovers components and previews requests with `plan --json`.
+- CPython 3.15 is supported for the generator and for generated projects:
+  - `python_version` accepts `3.15`;
+  - classifiers and the generated CI matrices include it;
+  - this repository's CI tests 3.11–3.15;
+  - smoke tests generate projects whose minimum matches the job's interpreter, so ruff's and
+    mypy's rules for the newest target are checked.
+- Generated FastAPI code returns `Self` instead of quoted class names, which ruff rejects
+  (UP037) for `python_version` 3.14 and later.
+
+### Fixed
+
+- Template paths fit within Windows' 260-character limit. Component files no longer use
+  conditional names; `create` and `update` exclude the manifest `paths` of unselected components
+  instead. Template paths are now at most 96 characters.
+- `pytemplate update`:
+  - resolves components against the release being updated to, not the installed one;
+  - never adds a component that the target release made a default;
+  - removes only the directories its exclusions emptied, leaving other empty directories in
+    place;
+  - reports pack and catalog problems as update errors before changing anything.
+- Test output no longer depends on terminal width.
 
 ### From the unreleased 2.1 work
 

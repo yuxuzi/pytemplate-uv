@@ -137,6 +137,21 @@ def _read_pack(root: Path) -> tuple[str, str]:
 
 
 @contextmanager
+def open_bundled_catalog_at(location: str, ref: str) -> Iterator[Catalog]:
+    """Yield the bundled catalog as it was at ``ref`` of its git source (for updates)."""
+    with tempfile.TemporaryDirectory(prefix="pytemplate-ref-") as scratch:
+        root = Path(scratch) / "source"
+        _clone(location, ref, root)
+        package = root / "pytemplate"
+        try:
+            yield load_catalog(package / "templates", package / "components")
+        except ManifestError as error:
+            raise PackError(
+                f"The templates at {ref} do not follow factory contract {CONTRACT_VERSION}: {error}"
+            ) from error
+
+
+@contextmanager
 def open_catalog(
     template: str | None = None, ref: str | None = None, *, bundled_location: str = ""
 ) -> Iterator[tuple[Catalog, TemplateSource, Path]]:

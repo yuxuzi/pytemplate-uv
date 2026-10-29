@@ -52,6 +52,11 @@ def template_source(tmp_path: Path) -> Path:
         source / "pytemplate" / "templates",
         ignore=shutil.ignore_patterns("__pycache__"),
     )
+    shutil.copytree(
+        REPO_ROOT / "pytemplate" / "components",
+        source / "pytemplate" / "components",
+        ignore=shutil.ignore_patterns("__pycache__"),
+    )
     shutil.copy2(REPO_ROOT / "copier.yml", source / "copier.yml")
     _git(source, "init", "-q")
     _commit_all(source, "templates")
@@ -270,3 +275,63 @@ def test_update_does_not_add_files_of_unselected_components(
     assert NEW_README_LINE in (project / "README.md").read_text(encoding="utf-8")
     assert not (project / "Dockerfile").exists()
     assert not (project / ".dockerignore").exists()
+
+
+def test_update_uses_the_component_paths_of_the_target_release(
+    project: Path, template_source: Path
+) -> None:
+    """A path the target release adds to an unselected component stays excluded."""
+    templates = template_source / "pytemplate"
+    (templates / "templates" / "python" / "template" / "compose.yaml").write_text(
+        "services: {}\n", "utf-8"
+    )
+    container = templates / "components" / "container.toml"
+    container.write_text(
+        container.read_text("utf-8").replace(
+            'paths = ["Dockerfile", ".dockerignore"]',
+            'paths = ["Dockerfile", ".dockerignore", "compose.yaml"]',
+        ),
+        "utf-8",
+    )
+    _release_new_template(template_source)
+
+    update(UpdateRequest(project, to_ref="v99.0.0", apply=True))
+
+    assert not (project / "compose.yaml").exists()
+    assert NEW_README_LINE in (project / "README.md").read_text(encoding="utf-8")
+
+
+def test_update_does_not_add_a_component_the_target_release_made_default(
+    project: Path, template_source: Path
+) -> None:
+    profile = template_source / "pytemplate" / "templates" / "python" / "profile.toml"
+    profile.write_text(
+        profile.read_text("utf-8")
+        .replace('default_components = ["cli"]', 'default_components = ["cli", "container"]')
+        .replace('optional_components = ["container"]', "optional_components = []"),
+        "utf-8",
+    )
+    _release_new_template(template_source)
+
+    update(UpdateRequest(project, to_ref="v99.0.0", apply=True))
+
+    manifest = tomllib.loads((project / ".pytemplate.toml").read_text(encoding="utf-8"))
+    answers = yaml.safe_load((project / ".copier-answers.yml").read_text(encoding="utf-8"))
+    assert not (project / "Dockerfile").exists()
+    assert [entry["id"] for entry in manifest["components"]] == ["cli"]
+    assert answers["components"] == ["cli"]
+
+
+def test_update_keeps_unrelated_empty_directories(project: Path, template_source: Path) -> None:
+    (project / "data" / "raw").mkdir(parents=True)
+    _release_new_template(template_source)
+
+    update(UpdateRequest(project, to_ref="v99.0.0", apply=True))
+
+    assert (project / "data" / "raw").is_dir()
+
+
+def test_unknown_target_release_is_an_update_error(project: Path) -> None:
+    with pytest.raises(UpdateError, match="Cannot prepare the update to v404"):
+        update(UpdateRequest(project, to_ref="v404", apply=True))
+    assert _git(project, "status", "--porcelain") == ""

@@ -32,6 +32,7 @@ def test_list_profiles_includes_the_bundled_profiles() -> None:
     assert "fastapi" in result.output
     assert "3.13" in result.output
     assert "3.14" in result.output
+    assert "3.15" in result.output
 
 
 def test_component_commands_describe_the_factory_contract() -> None:

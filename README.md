@@ -59,7 +59,7 @@ uvx pytemplate-uv --help            # run without installing
 uv tool install pytemplate-uv       # or install the `pytemplate` command
 ```
 
-Python 3.11–3.14 is supported. `pip install pytemplate-uv` also works.
+Python 3.11–3.15 is supported. `pip install pytemplate-uv` also works.
 
 ## Create a project
 
@@ -129,7 +129,7 @@ Notes:
   and required components are added automatically.
 - `--output-dir`, `-o`: existing parent directory (default `.`).
 - `--data`, `-d KEY=VALUE`: answer a template question; repeat as needed.
-  - Inputs are `package_name`, `description`, `author`, `email`, `python_version` (3.11–3.14),
+  - Inputs are `package_name`, `description`, `author`, `email`, `python_version` (3.11–3.15),
     and `license` (an SPDX expression).
 - `--template`, `-t SOURCE` and `--template-ref REF`: render from a template pack (see below).
 - `--no-input`: accept defaults instead of prompting.

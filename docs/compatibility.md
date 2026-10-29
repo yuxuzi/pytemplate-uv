@@ -42,7 +42,7 @@ format.
      in CI.
    - Upgrading a dependency is the project's decision.
 7. **Supported Python versions.**
-   - The generator and every stable profile support each CPython minor release from 3.11 to 3.14.
+   - The generator and every stable profile support each CPython minor release from 3.11 to 3.15.
    - Raising the minimum version is a major-release decision.
 
 ## Status levels

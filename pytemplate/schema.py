@@ -71,7 +71,7 @@ PROFILE = _document(
             "aliases": _NAMES,
             "supported_python": {
                 "type": "array",
-                "items": {"enum": ["3.11", "3.12", "3.13", "3.14"]},
+                "items": {"enum": ["3.11", "3.12", "3.13", "3.14", "3.15"]},
                 "uniqueItems": True,
             },
             "default_components": _NAMES,
