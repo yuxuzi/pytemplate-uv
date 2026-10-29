@@ -1,5 +1,8 @@
 """Command-line interface for {{ project_name }}."""
 
+{% if 'auth-api-key' in components -%}
+import json
+{% endif -%}
 from typing import Annotated
 
 import typer
@@ -7,7 +10,10 @@ import uvicorn
 from rich.console import Console
 from rich.table import Table
 
-from .core.config import get_settings
+from .bootstrap.settings import get_settings
+{%- if 'auth-api-key' in components %}
+from .security.api_key import hash_api_key
+{%- endif %}
 
 app = typer.Typer(
     help="Command-line interface for {{ project_name }}.",
@@ -29,6 +35,7 @@ def serve(
         host=host or settings.HOST,
         port=port or settings.PORT,
         reload=reload,
+        log_config=None,
     )
 
 
@@ -36,14 +43,27 @@ def serve(
 def info() -> None:
     """Show non-secret runtime settings."""
     settings = get_settings()
-    table = Table(title="Project Information")
+    table = Table(title=settings.APP_NAME)
     table.add_column("Setting", style="cyan")
     table.add_column("Value", style="magenta")
-    table.add_row("Name", settings.APP_NAME)
     table.add_row("Version", settings.APP_VERSION)
     table.add_row("Environment", settings.ENVIRONMENT)
     table.add_row("API prefix", settings.API_V1_PREFIX)
+    table.add_row("Allowed hosts", ", ".join(settings.ALLOWED_HOSTS))
     console.print(table)
+{%- if 'auth-api-key' in components %}
+
+
+@app.command("hash-api-key")
+def hash_api_key_command(
+    name: Annotated[str, typer.Option(help="Client name recorded in logs and audit events.")],
+    scope: Annotated[list[str] | None, typer.Option(help="Scope to grant; repeatable.")] = None,
+) -> None:
+    """Hash a new API key and print the API_KEYS entry to configure (never the key itself)."""
+    key = typer.prompt("API key", hide_input=True, confirmation_prompt=True)
+    entry = {"name": name, "sha256": hash_api_key(key), "scopes": scope or []}
+    typer.echo(json.dumps(entry))
+{%- endif %}
 
 
 def main() -> None:

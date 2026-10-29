@@ -1,0 +1,75 @@
+"""The application factory: settings and container in, a configured FastAPI app out."""
+
+import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+from fastapi import APIRouter, {% if 'auth' in components %}Depends, {% endif %}FastAPI
+
+from ..api import health
+from ..api.errors import register_exception_handlers
+from ..api.middleware import setup_middleware
+from ..api.routers import examples{% if 'worker' in components %}, jobs{% endif %}{% if 'auth' in components %}, me{% endif %}
+{%- if 'auth' in components %}
+from ..security.dependencies import rate_limit, require_scopes
+{%- endif %}
+from .container import Container, build_container
+from .logging import configure_logging
+from .settings import Settings, get_settings
+
+logger = logging.getLogger(__name__)
+
+
+def create_app(settings: Settings | None = None, container: Container | None = None) -> FastAPI:
+    """Build the application; pass a container to replace adapters (for example in tests)."""
+    config = settings or get_settings()
+    services = container or build_container(config)
+    configure_logging(config.LOG_LEVEL, config.LOG_FORMAT)
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        logger.info("Started %s %s in %s", config.APP_NAME, config.APP_VERSION, config.ENVIRONMENT)
+        try:
+            yield
+        finally:
+            for close in reversed(services.shutdown):
+                await close()
+
+    app = FastAPI(
+        title=config.APP_NAME,
+        version=config.APP_VERSION,
+        docs_url=config.DOCS_URL,
+        openapi_url=config.OPENAPI_URL,
+        lifespan=lifespan,
+    )
+    app.state.container = services
+    register_exception_handlers(app)
+    setup_middleware(app, config)
+
+    app.include_router(health.router)
+    api = APIRouter(prefix=config.API_V1_PREFIX)
+{%- if 'auth' in components %}
+    api.include_router(
+        examples.read_router,
+        dependencies=[Depends(rate_limit), Depends(require_scopes("examples:read"))],
+    )
+    api.include_router(
+        examples.write_router,
+        dependencies=[Depends(rate_limit), Depends(require_scopes("examples:write"))],
+    )
+{%- else %}
+    api.include_router(examples.read_router)
+    api.include_router(examples.write_router)
+{%- endif %}
+{%- if 'worker' in components and 'auth' in components %}
+    api.include_router(
+        jobs.router, dependencies=[Depends(rate_limit), Depends(require_scopes("jobs"))]
+    )
+{%- elif 'worker' in components %}
+    api.include_router(jobs.router)
+{%- endif %}
+{%- if 'auth' in components %}
+    api.include_router(me.router, dependencies=[Depends(rate_limit)])
+{%- endif %}
+    app.include_router(api)
+    return app

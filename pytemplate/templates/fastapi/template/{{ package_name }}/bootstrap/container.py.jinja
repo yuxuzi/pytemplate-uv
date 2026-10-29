@@ -1,0 +1,95 @@
+"""The service container: every adapter is built here, from settings, once per application."""
+
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
+{%- if 'database' not in components %}
+from functools import partial
+{%- endif %}
+
+{% if 'worker' in components -%}
+from ..application.tasks import TaskQueue
+{% endif -%}
+from ..domain.ports import UnitOfWork
+{%- if 'database' in components %}
+from ..infrastructure.database.engine import Database
+{%- else %}
+from ..infrastructure.memory import InMemoryExampleStore, InMemoryUnitOfWork
+{%- endif %}
+{%- if 'worker' in components %}
+from ..infrastructure.tasks import InProcessTaskQueue
+{%- endif %}
+{%- if 'auth-api-key' in components %}
+from ..security.api_key import ApiKeyAuthenticator
+{%- endif %}
+{%- if 'auth' in components %}
+from ..security.audit import AuditSink, LoggingAuditSink
+{%- endif %}
+{%- if 'auth-oidc' in components %}
+from ..security.oidc import OidcAuthenticator
+{%- endif %}
+{%- if 'auth' in components %}
+from ..security.principal import Authenticator
+from ..security.rate_limit import NoRateLimit, RateLimiter
+{%- endif %}
+from .settings import Settings
+
+ReadinessCheck = Callable[[], Awaitable[None]]
+Shutdown = Callable[[], Awaitable[None]]
+
+
+@dataclass
+class Container:
+    """Adapters behind the application's ports; tests build one with fakes instead."""
+
+    settings: Settings
+    unit_of_work: Callable[[], UnitOfWork]
+{%- if 'worker' in components %}
+    tasks: TaskQueue
+{%- endif %}
+{%- if 'auth' in components %}
+    authenticator: Authenticator
+    audit: AuditSink
+    rate_limiter: RateLimiter
+{%- endif %}
+    readiness_checks: dict[str, ReadinessCheck] = field(default_factory=dict)
+    shutdown: list[Shutdown] = field(default_factory=list)
+
+
+def build_container(settings: Settings) -> Container:
+    """Create the production adapters; nothing here connects to a service yet."""
+{%- if 'database' in components %}
+    database = Database(settings.DATABASE_URL.get_secret_value(), echo=settings.DEBUG)
+    readiness_checks: dict[str, ReadinessCheck] = {"database": database.ping}
+    shutdown: list[Shutdown] = [database.dispose]
+{%- else %}
+    store = InMemoryExampleStore()
+    readiness_checks: dict[str, ReadinessCheck] = {}
+    shutdown: list[Shutdown] = []
+{%- endif %}
+{%- if 'worker' in components %}
+    tasks = InProcessTaskQueue(max_concurrency=settings.WORKER_MAX_CONCURRENCY)
+    shutdown.append(tasks.shutdown)
+{%- endif %}
+    return Container(
+        settings=settings,
+{%- if 'database' in components %}
+        unit_of_work=database.unit_of_work,
+{%- else %}
+        unit_of_work=partial(InMemoryUnitOfWork, store),
+{%- endif %}
+{%- if 'worker' in components %}
+        tasks=tasks,
+{%- endif %}
+{%- if 'auth-api-key' in components %}
+        authenticator=ApiKeyAuthenticator(settings.API_KEYS),
+{%- endif %}
+{%- if 'auth-oidc' in components %}
+        authenticator=OidcAuthenticator.from_settings(settings),
+{%- endif %}
+{%- if 'auth' in components %}
+        audit=LoggingAuditSink(),
+        rate_limiter=NoRateLimit(),
+{%- endif %}
+        readiness_checks=readiness_checks,
+        shutdown=shutdown,
+    )

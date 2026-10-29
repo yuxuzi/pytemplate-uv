@@ -1,6 +1,6 @@
 ---
 name: pytemplate
-description: Create or update a uv-native Python project (typed package with a CLI, or a FastAPI service) with pytemplate-uv. Use when the user asks to create, scaffold, start, bootstrap, or generate a new Python package, CLI, library, or FastAPI/REST API project, or to upgrade a project that pytemplate-uv generated.
+description: Create or update a uv-native Python project (typed package with a CLI, or a layered FastAPI service with optional database, background jobs, API-key or OIDC auth, and Dockerfile) with pytemplate-uv. Use when the user asks to create, scaffold, start, bootstrap, or generate a new Python package, CLI, library, or FastAPI/REST API project, or to upgrade a project that pytemplate-uv generated.
 ---
 
 # Create Python projects with pytemplate-uv
@@ -25,20 +25,31 @@ If `uvx` is missing, ask the user to install uv (https://docs.astral.sh/uv/) and
 
 ```bash
 uvx pytemplate-uv list-profiles --json
-uvx pytemplate-uv describe-profile python --json
 uvx pytemplate-uv describe-profile fastapi --json
+uvx pytemplate-uv list-components --json
+uvx pytemplate-uv describe-component database --json
 ```
 
 Use the JSON output, not guesses:
 - `question_details` lists every input with its help text, default, and choices.
-- `lifecycle_commands` lists the commands a generated project must pass. Replace `{package}` with
-  the package name.
+- `default_components` are always included; `optional_components` may be added.
+- Each component lists `requires` (added automatically), `requires_any` (pick one), `conflicts`,
+  its dependencies, the files it owns, and the environment `settings` it reads.
+- If the user names a template pack, add `--template <dir or gh:org/repo>` (and
+  `--template-ref <tag>`) to every command, and set `template`/`template_ref` in the request.
 
 Choose the profile from what the user wants to build:
 - `python`: a library or command-line tool.
 - `fastapi`: an HTTP API or web service.
 
 If the request fits neither, say so instead of forcing a profile.
+
+For `fastapi`, map the user's needs to components and add only what they asked for:
+- persistence, SQL, PostgreSQL, migrations: `database`;
+- long-running or background work: `worker`;
+- service-to-service keys: `auth-api-key`; user login through an identity provider:
+  `auth-oidc` (choose one; `auth` is added automatically);
+- a Docker image: `container` (also available for `python`).
 
 ## 3. Collect inputs
 
@@ -63,6 +74,7 @@ Write `<project_name>.request.toml` in the output directory:
 ```toml
 project_name = "market-data-api"
 profile = "fastapi"
+components = ["database", "auth-oidc"]
 output_dir = "."            # relative to this file
 
 [data]
@@ -73,14 +85,17 @@ python_version = "3.12"
 license = "MIT"
 ```
 
-Then validate it:
+Then preview it; this validates everything, including the template's answer checks, and writes
+nothing:
 
 ```bash
-uvx pytemplate-uv validate market-data-api.request.toml
+uvx pytemplate-uv plan market-data-api.request.toml --json
 ```
 
-Fix any reported error and validate again. **Show the user the request and the target path, then
-wait for explicit confirmation before creating anything.**
+Exit code 1 means the request is invalid: read `error.message`, which says how to fix it, and
+plan again. Keep the plan's `lifecycle_commands`; they are the checks for step 6. **Show the user
+the request, the resolved components (including any in `added`), the new dependencies, and the
+target path, then wait for explicit confirmation before creating anything.**
 
 ## 5. Create the project
 
@@ -101,18 +116,20 @@ git init
 uv sync
 ```
 
-Then run every command in `lifecycle_commands`, which the generated `CLAUDE.md` also lists under
-"Commands": `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy <package>`, and
-`uv run pytest`. Report the real results. If something fails, show the output; do not hide or
+Then run every command in the plan's `lifecycle_commands` (replace `{package}` with the package
+name): `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy <package>`,
+`uv run pytest`, and component commands such as `uv run alembic upgrade head`. Report the real
+results. If something fails, show the output; do not hide or
 "fix" it by weakening checks. Finish by pointing the user to the generated `README.md` and
 `CLAUDE.md`, and suggest committing the initial project (`git add -A && git commit`).
 
 ## Updating an existing generated project
 
-Projects created by pytemplate-uv 2.1+ contain `.copier-answers.yml` and can be upgraded with a
+Projects created by pytemplate-uv 3.0+ contain `.copier-answers.yml` and can be upgraded with a
 three-way merge that keeps user edits.
 
-1. Make sure the project is a git repository with no uncommitted changes.
+1. Make sure the project is a git repository with no uncommitted changes. Projects from a
+   template pack need `--to <pack tag>`.
 2. Preview the update (a dry run that writes nothing):
    ```bash
    uvx pytemplate-uv update path/to/project
@@ -129,6 +146,8 @@ three-way merge that keeps user edits.
 
 - Never edit `.copier-answers.yml` or `.pytemplate.toml` by hand.
 - Never run `--force` or `update --apply` without explicit user approval.
+- Never put credentials into `.env.example`, a request file, or any answer; generated services
+  read secrets from the environment only.
 - Use pip, virtualenv activation, or make only if the user asks; generated projects use `uv` and
   `uvx`.
 - Report what actually happened, including failures.

@@ -1,0 +1,126 @@
+"""Typed settings, read from prefixed environment variables or an optional `.env` file."""
+
+from functools import lru_cache
+from typing import Literal, Self
+
+from pydantic import {% if 'auth-api-key' in components %}BaseModel, {% endif %}{% if 'auth-api-key' in components or 'worker' in components %}Field, {% endif %}{% if 'database' in components %}SecretStr, {% endif %}model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+Environment = Literal["development", "test", "production"]
+_LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "0.0.0.0"})
+{%- if 'database' in components %}
+LOCAL_DATABASE_URL = "sqlite+aiosqlite:///./{{ project_name }}.db"
+{%- endif %}
+{%- if 'auth-oidc' in components %}
+# Asymmetric algorithms only: HMAC and "none" would let a shared or empty secret sign tokens.
+SAFE_JWT_ALGORITHMS = frozenset(
+    {"RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512", "EdDSA"}
+)
+{%- endif %}
+{%- if 'auth-api-key' in components %}
+
+
+class ApiKey(BaseModel):
+    """One client key. Only its SHA-256 hash is configured, never the key itself."""
+
+    name: str = Field(min_length=1)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    scopes: list[str] = []
+{%- endif %}
+
+
+class Settings(BaseSettings):
+    """Every runtime setting; override one with the environment variable `<PREFIX><NAME>`."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="{{ package_name|upper }}_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+    APP_NAME: str = "{{ project_name }}"
+    APP_VERSION: str = "0.1.0"
+    ENVIRONMENT: Environment = "development"
+    DEBUG: bool = False
+
+    HOST: str = "127.0.0.1"
+    PORT: int = 8000
+
+    # Deny by default: list the host names and browser origins you actually serve.
+    ALLOWED_HOSTS: list[str] = ["localhost", "127.0.0.1"]
+    CORS_ORIGINS: list[str] = []
+
+    API_V1_PREFIX: str = "/api/v1"
+    DOCS_URL: str | None = "/docs"
+    OPENAPI_URL: str | None = "/openapi.json"
+
+    LOG_LEVEL: str = "INFO"
+    LOG_FORMAT: Literal["json", "text"] = "json"
+{%- if 'database' in components %}
+
+    # The local SQLite default suits development and tests; production must set its own URL.
+    DATABASE_URL: SecretStr = SecretStr(LOCAL_DATABASE_URL)
+{%- endif %}
+{%- if 'worker' in components %}
+
+    WORKER_MAX_CONCURRENCY: int = Field(default=4, ge=1)
+{%- endif %}
+{%- if 'auth-api-key' in components %}
+
+    # JSON list of {"name", "sha256", "scopes"}; create entries with the `hash-api-key` command.
+    API_KEYS: list[ApiKey] = []
+{%- endif %}
+{%- if 'auth-oidc' in components %}
+
+    OIDC_ISSUER: str = ""
+    OIDC_AUDIENCE: str = ""
+    OIDC_JWKS_URL: str = ""
+    OIDC_ALGORITHMS: list[str] = ["RS256"]
+{%- endif %}
+
+    @model_validator(mode="after")
+    def _refuse_unsafe_production_values(self) -> Self:
+{%- if 'auth-oidc' in components %}
+        unsafe = sorted(set(self.OIDC_ALGORITHMS) - SAFE_JWT_ALGORITHMS)
+        if unsafe or not self.OIDC_ALGORITHMS:
+            raise ValueError(f"OIDC_ALGORITHMS must be asymmetric algorithms, got {unsafe}.")
+{%- endif %}
+        if self.ENVIRONMENT != "production":
+            return self
+        problems: list[str] = []
+        if self.DEBUG:
+            problems.append("DEBUG must be false")
+        if not self.ALLOWED_HOSTS or any(
+            host == "*" or host in _LOCAL_HOSTS for host in self.ALLOWED_HOSTS
+        ):
+            problems.append("ALLOWED_HOSTS must list real host names, without '*' or localhost")
+        if any(
+            origin == "*" or "localhost" in origin or "127.0.0.1" in origin
+            for origin in self.CORS_ORIGINS
+        ):
+            problems.append("CORS_ORIGINS must not contain '*' or localhost origins")
+{%- if 'database' in components %}
+        if self.DATABASE_URL.get_secret_value() == LOCAL_DATABASE_URL:
+            problems.append("DATABASE_URL must be set explicitly")
+{%- endif %}
+{%- if 'auth-api-key' in components %}
+        if not self.API_KEYS:
+            problems.append("API_KEYS must contain at least one key")
+{%- endif %}
+{%- if 'auth-oidc' in components %}
+        if not (self.OIDC_ISSUER and self.OIDC_AUDIENCE and self.OIDC_JWKS_URL):
+            problems.append("OIDC_ISSUER, OIDC_AUDIENCE, and OIDC_JWKS_URL are required")
+        elif not self.OIDC_JWKS_URL.startswith("https://"):
+            problems.append("OIDC_JWKS_URL must use https")
+{%- endif %}
+        if problems:
+            raise ValueError("Unsafe production settings: " + "; ".join(problems) + ".")
+        return self
+
+
+@lru_cache
+def get_settings() -> Settings:
+    """Return the process-wide settings, read once from the environment."""
+    return Settings()

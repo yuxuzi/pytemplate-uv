@@ -1,0 +1,92 @@
+"""Settings defaults are safe, and production refuses unsafe values."""
+
+from typing import Any
+
+import pytest
+from pydantic import ValidationError
+
+from {{ package_name }}.bootstrap.settings import (
+{%- if 'database' in components %}
+    LOCAL_DATABASE_URL,
+{%- endif %}
+{%- if 'auth-api-key' in components %}
+    ApiKey,
+{%- endif %}
+    Settings,
+)
+
+PRODUCTION: dict[str, Any] = {
+    "_env_file": None,
+    "ENVIRONMENT": "production",
+    "ALLOWED_HOSTS": ["api.example.com"],
+{%- if 'database' in components %}
+    "DATABASE_URL": "postgresql+asyncpg://app@db.internal/app",
+{%- endif %}
+{%- if 'auth-api-key' in components %}
+    "API_KEYS": [ApiKey(name="client", sha256="0" * 64, scopes=["examples:read"])],
+{%- endif %}
+{%- if 'auth-oidc' in components %}
+    "OIDC_ISSUER": "https://login.example.com",
+    "OIDC_AUDIENCE": "api",
+    "OIDC_JWKS_URL": "https://login.example.com/jwks",
+{%- endif %}
+}
+
+
+def test_defaults_deny_wildcard_hosts_and_origins() -> None:
+    settings = Settings(_env_file=None)
+
+    assert "*" not in settings.ALLOWED_HOSTS
+    assert settings.CORS_ORIGINS == []
+
+
+def test_complete_production_settings_are_accepted() -> None:
+    assert Settings(**PRODUCTION).ENVIRONMENT == "production"
+
+
+@pytest.mark.parametrize(
+    ("override", "message"),
+    [
+        ({"ALLOWED_HOSTS": ["*"]}, "ALLOWED_HOSTS"),
+        ({"ALLOWED_HOSTS": ["localhost"]}, "ALLOWED_HOSTS"),
+        ({"CORS_ORIGINS": ["*"]}, "CORS_ORIGINS"),
+        ({"CORS_ORIGINS": ["http://localhost:3000"]}, "CORS_ORIGINS"),
+        ({"DEBUG": True}, "DEBUG"),
+{%- if 'database' in components %}
+        ({"DATABASE_URL": LOCAL_DATABASE_URL}, "DATABASE_URL"),
+{%- endif %}
+{%- if 'auth-api-key' in components %}
+        ({"API_KEYS": []}, "API_KEYS"),
+{%- endif %}
+{%- if 'auth-oidc' in components %}
+        ({"OIDC_JWKS_URL": ""}, "OIDC_ISSUER, OIDC_AUDIENCE, and OIDC_JWKS_URL"),
+        ({"OIDC_JWKS_URL": "http://login.example.com/jwks"}, "https"),
+{%- endif %}
+    ],
+)
+def test_production_refuses_unsafe_values(override: dict[str, Any], message: str) -> None:
+    with pytest.raises(ValidationError, match=message):
+        Settings(**(PRODUCTION | override))
+{%- if 'database' in components %}
+
+
+def test_database_url_is_hidden_from_repr() -> None:
+    settings = Settings(**PRODUCTION)
+
+    assert "db.internal" not in repr(settings)
+{%- endif %}
+{%- if 'auth-api-key' in components %}
+
+
+def test_placeholder_api_key_hashes_are_rejected() -> None:
+    with pytest.raises(ValidationError, match="sha256"):
+        ApiKey(name="client", sha256="replace-me")
+{%- endif %}
+{%- if 'auth-oidc' in components %}
+
+
+@pytest.mark.parametrize("algorithms", [["HS256"], ["none"], []])
+def test_symmetric_and_empty_algorithms_are_refused(algorithms: list[str]) -> None:
+    with pytest.raises(ValidationError, match="asymmetric"):
+        Settings(_env_file=None, OIDC_ALGORITHMS=algorithms)
+{%- endif %}

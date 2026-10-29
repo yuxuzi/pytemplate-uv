@@ -1,0 +1,81 @@
+"""OpenID Connect bearer tokens, signed with a throwaway key; no identity provider is called."""
+
+from collections.abc import Callable
+
+import pytest
+from cryptography.hazmat.primitives.asymmetric import rsa
+from httpx import AsyncClient
+
+EXAMPLES = "/api/v1/examples"
+
+
+def _bearer(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
+async def test_missing_token_is_401_with_a_challenge(anonymous: AsyncClient) -> None:
+    response = await anonymous.get(EXAMPLES)
+
+    assert response.status_code == 401
+    assert response.headers["WWW-Authenticate"] == "Bearer"
+
+
+async def test_valid_token_is_allowed(client: AsyncClient) -> None:
+    me = await client.get("/api/v1/me")
+
+    assert me.status_code == 200
+    assert me.json()["subject"] == "user-1"
+
+
+@pytest.mark.parametrize(
+    "claims",
+    [
+        {"expires_in": -60},
+        {"issuer": "https://other.test"},
+        {"audience": "another-service"},
+    ],
+    ids=["expired", "wrong-issuer", "wrong-audience"],
+)
+async def test_invalid_claims_are_401(
+    anonymous: AsyncClient, make_token: Callable[..., str], claims: dict[str, object]
+) -> None:
+    response = await anonymous.get(EXAMPLES, headers=_bearer(make_token(**claims)))
+
+    assert response.status_code == 401
+    assert "invalid_token" in response.headers["WWW-Authenticate"]
+
+
+async def test_token_signed_by_another_key_is_401(
+    anonymous: AsyncClient, make_token: Callable[..., str]
+) -> None:
+    other = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+    response = await anonymous.get(EXAMPLES, headers=_bearer(make_token(key=other)))
+
+    assert response.status_code == 401
+
+
+async def test_symmetric_algorithm_is_refused(
+    anonymous: AsyncClient, make_token: Callable[..., str]
+) -> None:
+    token = make_token(key="shared-secret-of-at-least-32-bytes!!", algorithm="HS256")
+
+    response = await anonymous.get(EXAMPLES, headers=_bearer(token))
+
+    assert response.status_code == 401
+
+
+async def test_malformed_token_is_401(anonymous: AsyncClient) -> None:
+    response = await anonymous.get(EXAMPLES, headers=_bearer("not.a.jwt"))
+
+    assert response.status_code == 401
+
+
+async def test_missing_scope_is_403(anonymous: AsyncClient, make_token: Callable[..., str]) -> None:
+    token = make_token(scopes=("examples:read",))
+
+    response = await anonymous.post(
+        EXAMPLES, json={"name": "a", "description": "d"}, headers=_bearer(token)
+    )
+
+    assert response.status_code == 403

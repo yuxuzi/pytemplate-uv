@@ -1,0 +1,21 @@
+contract = 1
+id = "worker"
+name = "Background jobs"
+description = "A TaskQueue port with an in-process adapter and job endpoints for long-running work; no queue backend is chosen."
+version = "1"
+status = "stable"
+compatible_profiles = ["fastapi"]
+requires = ["api"]
+paths = [
+    "{package}/application/tasks.py",
+    "{package}/infrastructure/tasks.py",
+    "{package}/api/routers/jobs.py",
+    "tests/unit/test_tasks.py",
+    "tests/integration/test_jobs.py",
+]
+security_notes = ["In-process jobs are lost on restart; use a durable queue adapter for work that must survive."]
+
+[[settings]]
+name = "WORKER_MAX_CONCURRENCY"
+type = "int"
+description = "Maximum jobs running at once in this process."

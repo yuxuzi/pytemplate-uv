@@ -1,0 +1,86 @@
+"""Domain rules and use cases, tested through the in-memory port adapters."""
+
+from datetime import UTC, datetime
+
+import pytest
+
+from {{ package_name }}.application.examples import ExampleService
+from {{ package_name }}.domain.errors import (
+    InvalidValueError,
+    NotFoundError,
+)
+from {{ package_name }}.domain.examples import (
+    ExampleChanges,
+    NewExample,
+)
+from {{ package_name }}.infrastructure.memory import (
+    InMemoryExampleStore,
+    InMemoryUnitOfWork,
+)
+
+NOW = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
+
+
+def _service(store: InMemoryExampleStore) -> ExampleService:
+    return ExampleService(InMemoryUnitOfWork(store), clock=lambda: NOW)
+
+
+@pytest.mark.parametrize("name", ["", "   ", "x" * 101])
+def test_new_examples_need_a_reasonable_name(name: str) -> None:
+    with pytest.raises(InvalidValueError, match="1 to 100 characters"):
+        NewExample(name=name, description="d")
+
+
+async def test_create_assigns_identifiers_and_timestamps() -> None:
+    store = InMemoryExampleStore()
+
+    async with InMemoryUnitOfWork(store) as uow:
+        first = await ExampleService(uow, clock=lambda: NOW).create(NewExample("a", "d"))
+        second = await ExampleService(uow, clock=lambda: NOW).create(NewExample("b", "d"))
+
+    assert (first.id, second.id) == (1, 2)
+    assert first.created_at == NOW
+    assert first.is_active is True
+
+
+async def test_changes_are_discarded_without_commit() -> None:
+    store = InMemoryExampleStore()
+
+    async with InMemoryUnitOfWork(store) as uow:
+        await uow.examples.add(NewExample("a", "d"), created_at=NOW)
+
+    assert store.rows == {}
+
+
+async def test_update_applies_only_given_fields() -> None:
+    store = InMemoryExampleStore()
+    async with InMemoryUnitOfWork(store) as uow:
+        created = await ExampleService(uow, clock=lambda: NOW).create(NewExample("a", "d", ("x",)))
+
+    async with InMemoryUnitOfWork(store) as uow:
+        updated = await _service(store).update(created.id, ExampleChanges(is_active=False))
+
+    assert (updated.name, updated.tags, updated.is_active) == ("a", ("x",), False)
+    assert updated.updated_at == NOW
+
+
+async def test_missing_examples_raise_not_found() -> None:
+    async with InMemoryUnitOfWork(InMemoryExampleStore()) as uow:
+        service = ExampleService(uow)
+        with pytest.raises(NotFoundError, match="Example 7 was not found"):
+            await service.get(7)
+        with pytest.raises(NotFoundError):
+            await service.delete(7)
+
+
+async def test_page_and_count() -> None:
+    store = InMemoryExampleStore()
+    async with InMemoryUnitOfWork(store) as uow:
+        service = ExampleService(uow, clock=lambda: NOW)
+        for index in range(3):
+            await service.create(NewExample(f"e{index}", "d"))
+
+        page = await service.page(offset=1, limit=5)
+
+        assert [item.name for item in page] == ["e1", "e2"]
+        assert await service.count() == 3

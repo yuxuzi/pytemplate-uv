@@ -1,8 +1,30 @@
+contract = 1
 id = "database"
-name = "Database foundation"
-description = "SQLAlchemy-backed persistence foundation included by the FastAPI profile."
-version = "1"
+name = "Database"
+description = "SQLAlchemy 2.x async persistence with Alembic migrations, a repository and unit of work behind the domain port, SQLite locally and PostgreSQL through the postgres group."
+version = "2"
+status = "stable"
 compatible_profiles = ["fastapi"]
-dependency_groups = []
-template_fragments = ["fastapi-template"]
-configuration_schema = "DATABASE_URL selects the database adapter."
+requires = ["api"]
+dependencies = ["aiosqlite>=0.20", "alembic>=1.14", "sqlalchemy[asyncio]>=2.0.36"]
+paths = [
+    "{package}/infrastructure/database/*.py",
+    "alembic.ini",
+    "migrations/**",
+    "tests/integration/test_database.py",
+]
+lifecycle_commands = ["uv run alembic upgrade head"]
+security_notes = [
+    "DATABASE_URL may contain credentials; supply it from the environment only.",
+    "Migrations never run on startup; apply them with `uv run alembic upgrade head`.",
+]
+
+[dependency_groups]
+postgres = ["asyncpg>=0.30"]
+
+[[settings]]
+name = "DATABASE_URL"
+type = "str"
+description = "SQLAlchemy async URL, for example postgresql+asyncpg://user@host/db."
+required_in_production = true
+secret = true

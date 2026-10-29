@@ -1,0 +1,23 @@
+contract = 1
+id = "auth"
+name = "Authentication and authorization"
+description = "A Principal with scopes behind require_scopes(), an audit sink, and a rate-limit seam; pair it with exactly one mode."
+version = "1"
+status = "stable"
+compatible_profiles = ["fastapi"]
+requires = ["api"]
+requires_any = ["auth-api-key", "auth-oidc"]
+paths = [
+    "{package}/security/__init__.py",
+    "{package}/security/principal.py",
+    "{package}/security/audit.py",
+    "{package}/security/dependencies.py",
+    "{package}/security/rate_limit.py",
+    "{package}/api/routers/me.py",
+    "SECURITY.md",
+    "tests/unit/test_principal.py",
+]
+security_notes = [
+    "Routes never parse credentials; they depend on require_scopes().",
+    "Password and account management is out of scope.",
+]

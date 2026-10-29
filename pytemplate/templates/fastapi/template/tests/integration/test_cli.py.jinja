@@ -1,0 +1,43 @@
+"""The command-line interface."""
+
+{%- if 'auth-api-key' in components %}
+
+import json
+{%- endif %}
+
+from typer.testing import CliRunner
+
+from {{ package_name }}.cli import app
+{%- if 'auth-api-key' in components %}
+from {{ package_name }}.security.api_key import hash_api_key
+{%- endif %}
+
+runner = CliRunner()
+
+
+def test_help_lists_commands() -> None:
+    result = runner.invoke(app, ["--help"])
+
+    assert result.exit_code == 0
+    assert "serve" in result.output
+    assert "info" in result.output
+
+
+def test_info_shows_settings_without_secrets() -> None:
+    result = runner.invoke(app, ["info"])
+
+    assert result.exit_code == 0
+    assert "Environment" in result.output
+    assert "DATABASE_URL" not in result.output
+{%- if 'auth-api-key' in components %}
+
+
+def test_hash_api_key_prints_only_the_hash() -> None:
+    result = runner.invoke(
+        app, ["hash-api-key", "--name", "ci", "--scope", "examples:read"], input="k3y\nk3y\n"
+    )
+
+    entry = json.loads(result.output.strip().splitlines()[-1])
+    assert result.exit_code == 0, result.output
+    assert entry == {"name": "ci", "sha256": hash_api_key("k3y"), "scopes": ["examples:read"]}
+{%- endif %}

@@ -1,8 +1,75 @@
+contract = 1
 id = "api"
-name = "FastAPI HTTP API"
-description = "Asynchronous HTTP API foundation included by the FastAPI profile."
-version = "1"
+name = "HTTP API foundation"
+description = "Layered FastAPI service: routers and schemas, services, domain ports, adapters, health and readiness, JSON logs with request IDs, and one error envelope."
+version = "2"
+status = "stable"
 compatible_profiles = ["fastapi"]
-dependency_groups = []
-template_fragments = ["fastapi-template"]
-configuration_schema = "Application settings are supplied through environment variables."
+dependencies = ["fastapi>=0.115", "pydantic-settings>=2.6", "uvicorn>=0.32"]
+paths = [
+    "{package}/main.py",
+    "{package}/cli.py",
+    "{package}/bootstrap/*.py",
+    "{package}/api/*.py",
+    "{package}/api/routers/__init__.py",
+    "{package}/api/routers/examples.py",
+    "{package}/domain/*.py",
+    "{package}/application/__init__.py",
+    "{package}/application/examples.py",
+    "{package}/infrastructure/__init__.py",
+    "{package}/infrastructure/memory.py",
+    ".env.example",
+    "tests/conftest.py",
+    "tests/unit/__init__.py",
+    "tests/unit/test_examples.py",
+    "tests/unit/test_settings.py",
+    "tests/unit/test_logging.py",
+    "tests/integration/__init__.py",
+    "tests/integration/test_api.py",
+    "tests/integration/test_cli.py",
+]
+security_notes = [
+    "ALLOWED_HOSTS and CORS_ORIGINS are deny-by-default; production rejects wildcards, localhost, and DEBUG.",
+    "Logs are JSON with a request ID and redact Authorization headers, API keys, and tokens.",
+]
+
+[[settings]]
+name = "ENVIRONMENT"
+type = "str"
+description = "Deployment environment: development, test, or production."
+
+[[settings]]
+name = "DEBUG"
+type = "bool"
+description = "Enable debug behaviour; refused in production."
+
+[[settings]]
+name = "HOST"
+type = "str"
+description = "Bind address for `serve`."
+
+[[settings]]
+name = "PORT"
+type = "int"
+description = "Port for `serve`."
+
+[[settings]]
+name = "ALLOWED_HOSTS"
+type = "list"
+description = "Host names the service answers for."
+required_in_production = true
+
+[[settings]]
+name = "CORS_ORIGINS"
+type = "list"
+description = "Browser origins allowed by CORS; empty disables CORS."
+
+[[settings]]
+name = "LOG_LEVEL"
+type = "str"
+description = "Python logging level."
+
+[[settings]]
+name = "LOG_FORMAT"
+type = "str"
+description = "json (default) or text."

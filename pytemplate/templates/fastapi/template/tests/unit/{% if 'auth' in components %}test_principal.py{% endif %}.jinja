@@ -1,0 +1,26 @@
+"""Principal scopes and the audit sink."""
+
+import logging
+
+import pytest
+
+from {{ package_name }}.security.audit import (
+    AuditEvent,
+    LoggingAuditSink,
+)
+from {{ package_name }}.security.principal import Principal
+
+
+def test_missing_reports_only_absent_scopes() -> None:
+    principal = Principal("svc", frozenset({"examples:read"}))
+
+    assert principal.missing(frozenset({"examples:read", "jobs"})) == frozenset({"jobs"})
+
+
+async def test_audit_events_are_logged(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.INFO, logger="audit"):
+        await LoggingAuditSink().record(AuditEvent("GET /x", "denied", "svc", "missing scopes"))
+
+    (record,) = caplog.records
+    assert record.__dict__["outcome"] == "denied"
+    assert record.__dict__["subject"] == "svc"

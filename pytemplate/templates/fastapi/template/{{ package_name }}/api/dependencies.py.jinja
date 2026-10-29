@@ -1,0 +1,48 @@
+"""FastAPI dependencies: the only way handlers reach settings, services, and adapters."""
+
+from collections.abc import AsyncIterator
+from typing import Annotated
+
+from fastapi import Depends, Request
+
+from ..application.examples import ExampleService
+{%- if 'worker' in components %}
+from ..application.tasks import TaskQueue
+{%- endif %}
+from ..bootstrap.container import Container
+from ..domain.ports import UnitOfWork
+
+
+def get_container(request: Request) -> Container:
+    """Return the container that `create_app` attached to the application."""
+    container: Container = request.app.state.container
+    return container
+
+
+ContainerDep = Annotated[Container, Depends(get_container)]
+
+
+async def get_unit_of_work(container: ContainerDep) -> AsyncIterator[UnitOfWork]:
+    """Open one unit of work per request; uncommitted changes are rolled back."""
+    async with container.unit_of_work() as unit_of_work:
+        yield unit_of_work
+
+
+def get_example_service(
+    unit_of_work: Annotated[UnitOfWork, Depends(get_unit_of_work)],
+) -> ExampleService:
+    """Return the example use cases bound to this request's unit of work."""
+    return ExampleService(unit_of_work)
+
+
+ExampleServiceDep = Annotated[ExampleService, Depends(get_example_service)]
+{%- if 'worker' in components %}
+
+
+def get_task_queue(container: ContainerDep) -> TaskQueue:
+    """Return the background task queue."""
+    return container.tasks
+
+
+TaskQueueDep = Annotated[TaskQueue, Depends(get_task_queue)]
+{%- endif %}

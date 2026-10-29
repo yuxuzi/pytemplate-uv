@@ -22,7 +22,8 @@ uv run ruff check .
 uv run ruff format --check pytemplate tests
 uv run mypy
 uv run pytest
-PYTEMPLATE_SMOKE=1 uv run pytest tests/test_generated_projects.py   # needs network
+PYTEMPLATE_SMOKE=1 uv run pytest tests/test_generated_projects.py   # needs network, ~3 minutes
+PYTEMPLATE_SMOKE=1 PYTEMPLATE_SMOKE_PROFILE=fastapi uv run pytest tests/test_generated_projects.py
 ```
 
 ## Changing templates
@@ -30,8 +31,24 @@ PYTEMPLATE_SMOKE=1 uv run pytest tests/test_generated_projects.py   # needs netw
 - Templates are Copier templates in `pytemplate/templates/<profile>/`. Only files ending in
   `.jinja` are rendered; keep GitHub Actions `${{ }}` expressions in non-`.jinja` files, or wrap
   them in `{% raw %}` blocks.
-- Generated projects must pass every command in the profile's `lifecycle_commands`. The smoke test
-  renders each profile with a long project name and runs them all.
+- Generated projects must pass every resolved `lifecycle_commands` entry. The smoke test renders
+  every distinct component set of every profile with a long project name and runs them all.
+
+## Adding a component
+
+1. Write `pytemplate/components/<id>.toml` (`pytemplate schema component`). Declare its
+   `requires`, `conflicts`, dependencies, owned `paths`, `settings`, and `security_notes`.
+2. Add its files to each compatible profile tree, behind conditional names such as
+   `{% if '<id>' in components %}name{% endif %}`. Use `{% if %}` blocks only inside files the
+   profile or another component owns.
+3. Add its dependencies to the profile's `pyproject.toml.jinja` and its settings to
+   `.env.example.jinja`.
+4. Add `<id>` to the `components` choices in `questions.yml` and to `optional_components` in each
+   compatible `profile.toml`.
+5. Run `uv run pytest tests/test_composition.py`, then the smoke tests. Composition fails if
+   owned paths, dependencies, or settings drift from the manifest.
+
+No change to `main.py`, `rendering.py`, or unrelated profiles is needed.
 - Keep the profile's `CLAUDE.md.jinja`, `README.md.jinja`, CI workflow, and `lifecycle_commands`
   consistent; tests check that the commands match.
 - Never add Copier `_tasks` or `_migrations`, network access at render time, or real secrets.

@@ -1,0 +1,49 @@
+"""Structured logs carry the request ID and never the credentials."""
+
+import json
+import logging
+
+import pytest
+
+from {{ package_name }}.bootstrap.logging import (
+    ContextFilter,
+    JsonFormatter,
+    redact,
+    request_id,
+)
+
+
+def _record(message: str, *args: object) -> logging.LogRecord:
+    return logging.LogRecord("test", logging.INFO, __file__, 1, message, args, None)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Authorization: Bearer abc.def.ghi",
+        "x-api-key=supersecret",
+        'token="supersecret"',
+        "password: hunter2",
+    ],
+)
+def test_redact_masks_credentials(text: str) -> None:
+    masked = redact(text)
+
+    assert "[REDACTED]" in masked
+    for secret in ("abc.def.ghi", "supersecret", "hunter2"):
+        assert secret not in masked
+
+
+def test_json_records_include_the_request_id_and_extra_fields() -> None:
+    token = request_id.set("req-1")
+    try:
+        record = _record("GET %s", "/x")
+        record.__dict__["status"] = 200
+        ContextFilter().filter(record)
+        payload = json.loads(JsonFormatter().format(record))
+    finally:
+        request_id.reset(token)
+
+    assert payload["message"] == "GET /x"
+    assert payload["request_id"] == "req-1"
+    assert payload["status"] == 200

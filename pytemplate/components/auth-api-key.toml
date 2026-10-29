@@ -1,0 +1,21 @@
+contract = 1
+id = "auth-api-key"
+name = "API-key authentication"
+description = "Service-to-service authentication with hashed API keys in the X-API-Key header."
+version = "1"
+status = "stable"
+compatible_profiles = ["fastapi"]
+requires = ["auth"]
+conflicts = ["auth-oidc"]
+paths = ["{package}/security/api_key.py", "tests/integration/test_api_key_auth.py"]
+security_notes = [
+    "Only SHA-256 hashes of keys are configured; keys are compared in constant time.",
+    "Production refuses an empty API_KEYS list.",
+]
+
+[[settings]]
+name = "API_KEYS"
+type = "list"
+description = "JSON list of {name, sha256, scopes}; create hashes with `<package> hash-api-key`."
+required_in_production = true
+secret = true

@@ -1,11 +1,19 @@
+contract = 1
 id = "python"
 name = "Python CLI or library"
 description = "A compact Python package with a CLI, tests, and development tooling."
-version = "2"
+version = "3"
+kind = "cli"
+status = "stable"
 aliases = ["pyproject"]
 supported_python = ["3.11", "3.12", "3.13", "3.14"]
-components = ["cli"]
 default_components = ["cli"]
-configuration_schema = "questions.yml"
+optional_components = ["container"]
+legacy_components = ["container"]
+dependencies = []
+questions = ["description", "author", "email", "python_version", "license"]
 lifecycle_commands = ["uv sync", "uv run ruff check .", "uv run ruff format --check .", "uv run mypy {package}", "uv run pytest"]
 security_posture = "No external services or secrets are required to render or test the default project."
+
+[dependency_groups]
+dev = ["mypy>=1.11", "pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.6"]

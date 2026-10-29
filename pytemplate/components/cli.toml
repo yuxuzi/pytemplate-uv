@@ -1,8 +1,9 @@
+contract = 1
 id = "cli"
 name = "Command-line interface"
 description = "Typer-based command-line entry point included by the Python profile."
 version = "1"
+status = "stable"
 compatible_profiles = ["python"]
-dependency_groups = []
-template_fragments = ["pyproject-template"]
-configuration_schema = "No additional configuration."
+dependencies = ["rich>=13.7", "typer>=0.12"]
+paths = ["{package}/cli.py", "tests/test_cli.py"]

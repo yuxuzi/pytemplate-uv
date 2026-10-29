@@ -1,0 +1,69 @@
+"""The in-process task queue."""
+
+import asyncio
+
+from {{ package_name }}.application.tasks import JobState
+from {{ package_name }}.infrastructure.tasks import InProcessTaskQueue
+
+
+async def test_jobs_run_and_record_results() -> None:
+    queue = InProcessTaskQueue()
+
+    async def work() -> dict[str, object]:
+        return {"answer": 42}
+
+    job = await queue.submit("answer", work)
+    await queue.drain()
+
+    assert (await queue.get(job.id)) is job
+    assert (job.state, job.result) == (JobState.SUCCEEDED, {"answer": 42})
+
+
+async def test_failures_are_recorded_without_the_message() -> None:
+    queue = InProcessTaskQueue()
+
+    async def work() -> dict[str, object]:
+        raise ValueError("token=secret")
+
+    job = await queue.submit("fails", work)
+    await queue.drain()
+
+    assert (job.state, job.error) == (JobState.FAILED, "ValueError")
+
+
+async def test_concurrency_is_bounded() -> None:
+    queue = InProcessTaskQueue(max_concurrency=1)
+    running = 0
+    peak = 0
+
+    async def work() -> dict[str, object]:
+        nonlocal running, peak
+        running += 1
+        peak = max(peak, running)
+        await asyncio.sleep(0.01)
+        running -= 1
+        return {}
+
+    for _ in range(3):
+        await queue.submit("bounded", work)
+    await queue.drain()
+
+    assert peak == 1
+
+
+async def test_shutdown_cancels_unfinished_jobs() -> None:
+    queue = InProcessTaskQueue()
+
+    async def work() -> dict[str, object]:
+        await asyncio.sleep(10)
+        return {}
+
+    job = await queue.submit("slow", work)
+    await asyncio.sleep(0)
+    await queue.shutdown()
+
+    assert (job.state, job.error) == (JobState.FAILED, "cancelled")
+
+
+async def test_unknown_jobs_are_none() -> None:
+    assert await InProcessTaskQueue().get("missing") is None

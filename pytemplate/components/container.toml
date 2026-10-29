@@ -1,0 +1,9 @@
+contract = 1
+id = "container"
+name = "Container image"
+description = "A reproducible Dockerfile for local or deployment use; Docker is never needed for tests."
+version = "1"
+status = "stable"
+compatible_profiles = ["fastapi", "python"]
+paths = ["Dockerfile", ".dockerignore"]
+security_notes = ["The image runs as an unprivileged user and never bakes in .env files."]
