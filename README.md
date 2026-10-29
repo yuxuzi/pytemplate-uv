@@ -8,13 +8,14 @@
 > **Generate production-ready Python projects in seconds.** A deterministic application factory
 > with profiles, composable components, and template packs.
 
-A modern application factory that generates **uv-native** Python projects that pass linting,
-formatting, type-checking, and tests from the first commit. Choose a profile (a typed package
+A modern application factory that generates **uv-native** Python projects. With the bundled
+templates, every project passes linting, formatting, type-checking, and tests from the first
+commit. Choose a profile (a typed package
 with a CLI, or a FastAPI service), add components (database, authentication, background jobs), and get a
 ready-to-deploy project.
 
 - ✅ **Deterministic:** identical requests produce byte-identical projects
-- ✅ **Production-ready:** every component combination passes strict quality gates
+- ✅ **Checked:** every bundled component combination passes strict quality gates in CI
 - ✅ **uv-native:** generated projects need only `uv` and `uvx` (no pip, virtualenv activation, or make)
 - ✅ **Extensible:** use template packs to customize without forking
 - ✅ **Type-safe:** strict mypy on generated code; requests are validated before anything is written
@@ -40,12 +41,13 @@ Mix components freely — the generator validates combinations and adds required
 
 ### Quality from day one
 
-Every generated project passes:
+Every project generated from the bundled templates passes:
 - ✅ `ruff check` and `ruff format --check` (code quality and style)
 - ✅ Strict `mypy` (type safety)
 - ✅ `pytest` (tests included)
 
-This is verified across 26 component combinations on every commit.
+This is verified across all 26 bundled component combinations on every commit. Projects from
+your own template packs are not covered by these checks; test your pack the same way.
 
 ### Built for teams
 
@@ -65,8 +67,8 @@ This is verified across 26 component combinations on every commit.
 **The solution:**
 - Start from reviewed patterns: layered architecture, health checks, structured logs, auth
   behind a principal and scopes
-- Every component combination is generated and checked in CI (26 combinations, Linux, macOS,
-  and Windows)
+- Every bundled component combination is generated and checked in CI (26 combinations, on
+  Linux and Windows)
 - Pull in later template releases with `pytemplate update`: a three-way merge that keeps your
   edits and marks real conflicts inline
 - Script it: the same request always produces the same project
@@ -146,7 +148,7 @@ uvx --from pytemplate-uv create-project pricing-api -p fastapi --no-input
 | `skill install` / `skill show` | Install or print the AI project-creation skill |
 
 **Tips:**
-- Every command except `update` and `skill` accepts `--json`
+- Every command except `schema` (which already prints JSON), `update`, and `skill` accepts `--json`
 - Use `--template` to render from your own template pack
 - `plan`, `validate`, and `update` without `--apply` write nothing
 
@@ -338,9 +340,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 ## FAQ
 
 **Can I use this in production?**
-The generated code is a starting point you own. Every `stable` component combination passes lint,
-format, strict type-checking, and its tests in CI, and `SECURITY.md` lists what you still need to
-configure for deployment.
+The generated code is a starting point you own. Every `stable` bundled component combination
+passes lint, format, strict type-checking, and its tests in CI. Projects with authentication
+also get a `SECURITY.md` that lists what you still need to configure for deployment; for others,
+review the generated `README.md` (and `.env.example` for FastAPI services).
 
 **What if I want to customize the templates?**
 Use `--template` to point to your own template pack (a directory or git repo). You get all the
