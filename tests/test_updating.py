@@ -2,13 +2,16 @@
 
 import shutil
 import subprocess
+import tomllib
 from pathlib import Path
 
 import pytest
 import yaml
 from copier import Settings, run_copy
 
+from pytemplate.profiles import get_profile
 from pytemplate.rendering import RenderRequest, generator_version, render
+from pytemplate.resolution import resolve
 from pytemplate.updating import UpdateError, UpdateRequest, update
 
 pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git is required")
@@ -127,7 +130,7 @@ def test_update_refuses_a_dirty_tree(project: Path) -> None:
 
 
 def test_update_requires_an_answers_file(tmp_path: Path) -> None:
-    with pytest.raises(UpdateError, match="2.1 or later"):
+    with pytest.raises(UpdateError, match="3.0 or later"):
         update(UpdateRequest(tmp_path, to_ref="v99.0.0"))
 
 
@@ -169,7 +172,11 @@ def test_git_entry_point_renders_the_same_files_as_the_bundled_one(
     run_copy(
         str(template_source),
         from_git,
-        data={"profile": profile_id, "project_name": "demo-app"},
+        data={
+            "profile": profile_id,
+            "project_name": "demo-app",
+            "components": list(resolve(get_profile(profile_id)).component_ids),
+        },
         vcs_ref=f"v{generator_version()}",
         defaults=True,
         quiet=True,
@@ -203,3 +210,35 @@ def test_no_template_file_is_ignored_by_git() -> None:
     )
 
     assert ignored.stdout == ""
+
+
+def test_update_keeps_the_components_of_a_project_generated_before_3_0(
+    project: Path, template_source: Path
+) -> None:
+    answers_path = project / ".copier-answers.yml"
+    answers = yaml.safe_load(answers_path.read_text(encoding="utf-8"))
+    del answers["components"]
+    answers_path.write_text(yaml.safe_dump(answers), encoding="utf-8")
+    manifest_path = project / ".pytemplate.toml"
+    manifest_path.write_text(
+        '[generator]\nname = "pytemplate-uv"\nversion = "2.1.0"\n\n'
+        '[profile]\nid = "python"\nversion = "2"\nsupported_python = ["3.11"]\n\n'
+        '[[components]]\nid = "cli"\nversion = "1"\n',
+        encoding="utf-8",
+    )
+    _commit_all(project, "2.x project")
+    _release_new_template(template_source)
+
+    update(UpdateRequest(project, to_ref="v99.0.0", apply=True))
+
+    updated = yaml.safe_load(answers_path.read_text(encoding="utf-8"))
+    manifest = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
+    assert updated["components"] == ["cli", "container"]
+    assert (project / "Dockerfile").is_file()
+    assert manifest["schema"] == 2
+    assert [entry["id"] for entry in manifest["components"]] == ["cli", "container"]
+    assert manifest["template"] == {
+        "kind": "bundled",
+        "source": str(template_source),
+        "ref": "v99.0.0",
+    }

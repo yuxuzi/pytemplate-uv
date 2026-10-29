@@ -1,0 +1,55 @@
+"""API-key authentication and scope checks, with synthetic keys only."""
+
+import logging
+
+import pytest
+from httpx import AsyncClient
+
+from {{ package_name }}.security.api_key import API_KEY_HEADER
+
+from ..conftest import READER_KEY
+
+EXAMPLES = "/api/v1/examples"
+
+
+async def test_missing_key_is_401_with_a_challenge(anonymous: AsyncClient) -> None:
+    response = await anonymous.get(EXAMPLES)
+
+    assert response.status_code == 401
+    assert response.headers["WWW-Authenticate"] == "ApiKey"
+    assert response.json()["error"]["code"] == "UNAUTHENTICATED"
+
+
+async def test_wrong_key_is_401(anonymous: AsyncClient) -> None:
+    response = await anonymous.get(EXAMPLES, headers={API_KEY_HEADER: "not-a-key"})
+
+    assert response.status_code == 401
+
+
+async def test_valid_key_with_scope_is_allowed(client: AsyncClient) -> None:
+    created = await client.post(EXAMPLES, json={"name": "a", "description": "d"})
+    me = await client.get("/api/v1/me")
+
+    assert created.status_code == 201
+    assert me.json() == {"subject": "tests", "scopes": ["examples:read", "examples:write", "jobs"]}
+
+
+async def test_missing_scope_is_403_and_audited(
+    anonymous: AsyncClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    headers = {API_KEY_HEADER: READER_KEY}
+    with caplog.at_level(logging.INFO, logger="audit"):
+        read = await anonymous.get(EXAMPLES, headers=headers)
+        write = await anonymous.post(
+            EXAMPLES, json={"name": "a", "description": "d"}, headers=headers
+        )
+
+    assert read.status_code == 200
+    assert write.status_code == 403
+    assert write.json()["error"]["code"] == "FORBIDDEN"
+    denied = [r for r in caplog.records if r.__dict__.get("outcome") == "denied"]
+    assert denied[0].__dict__["subject"] == "reader"
+
+
+async def test_health_endpoints_stay_public(anonymous: AsyncClient) -> None:
+    assert (await anonymous.get("/health/live")).status_code == 200

@@ -2,8 +2,13 @@
 
 {{ description }}
 
-An asynchronous FastAPI service with SQLModel persistence, typed settings, structured errors,
-request IDs, and deny-by-default host and CORS policies.
+A layered FastAPI service with health and readiness endpoints, JSON logs with request IDs, and
+one error envelope
+{%- if 'database' in components %}, SQLAlchemy persistence with Alembic migrations{% endif %}
+{%- if 'worker' in components %}, background jobs{% endif %}
+{%- if 'auth-api-key' in components %}, API-key authentication{% endif %}
+{%- if 'auth-oidc' in components %}, OpenID Connect authentication{% endif %}.
+It runs locally without any external service.
 
 ## Requirements
 
@@ -13,22 +18,55 @@ and every development tool on demand, on Windows, macOS, and Linux.
 ## Getting started
 
 ```bash
-uv sync                                        # create .venv with the dev group
-uv lock                                        # create uv.lock, then commit it
-uv run fastapi dev {{ package_name }}/main.py   # auto-reloading development server
+uv sync                                  # create .venv with the dev group
+uv lock                                  # create uv.lock, then commit it
+{%- if 'database' in components %}
+uv run alembic upgrade head              # create the local SQLite database
+{%- endif %}
+uv run {{ package_name }} serve --reload   # development server on http://127.0.0.1:8000
 ```
 
-Open <http://localhost:8000/docs> for interactive API documentation and
-<http://localhost:8000/health> for the health check.
+Open <http://127.0.0.1:8000/docs> for the interactive API documentation.
+`/health/live` reports that the process is up, and `/health/ready` checks its dependencies.
 
 ## Configuration
 
-Settings live in `{{ package_name }}/core/config.py`. Override any of them with an environment
-variable prefixed `{{ package_name|upper }}_`, or copy `.env.example` to `.env` for local values.
-`.env` is git-ignored; never commit it.
+Settings live in `{{ package_name }}/bootstrap/settings.py`. Override any of them with an
+environment variable prefixed `{{ package_name|upper }}_`, or copy `.env.example` to `.env` for
+local values. `.env` is git-ignored; never commit it.
 
-In production, set `{{ package_name|upper }}_ENVIRONMENT=production` and list the real
-`{{ package_name|upper }}_ALLOWED_HOSTS` and `{{ package_name|upper }}_CORS_ORIGINS`; wildcards are rejected there.
+In production, set `{{ package_name|upper }}_ENVIRONMENT=production` and the real
+`{{ package_name|upper }}_ALLOWED_HOSTS`. Startup fails if a production setting is unsafe
+{%- if 'database' in components %}, if `DATABASE_URL` is left at the local default{% endif %}
+{%- if 'auth' in components %}, or if the authentication settings are missing{% endif %}.
+{%- if 'database' in components %}
+
+## Database
+
+The default is a local SQLite file. For PostgreSQL, install the driver with
+`uv sync --group postgres` and set
+`{{ package_name|upper }}_DATABASE_URL=postgresql+asyncpg://user@host/db`.
+
+| Task | Command |
+| --- | --- |
+| Apply migrations | `uv run alembic upgrade head` |
+| Create a migration after changing `infrastructure/database/models.py` | `uv run alembic revision --autogenerate -m "describe the change"` |
+| Check that models and migrations agree | `uv run alembic check` |
+
+Migrations never run on startup. Tests migrate a private SQLite file per test.
+{%- endif %}
+{%- if 'auth' in components %}
+
+## Authentication
+
+See [SECURITY.md](SECURITY.md) for the security model.
+{%- if 'auth-api-key' in components %} Create a key's configuration entry with
+`uv run {{ package_name }} hash-api-key --name <client> --scope examples:read`, and send the key in
+the `X-API-Key` header.
+{%- else %} Configure `{{ package_name|upper }}_OIDC_ISSUER`, `_OIDC_AUDIENCE`, and `_OIDC_JWKS_URL`,
+and send `Authorization: Bearer <token>`.
+{%- endif %} `GET /api/v1/me` shows the authenticated caller.
+{%- endif %}
 
 ## Development
 
@@ -38,28 +76,37 @@ In production, set `{{ package_name|upper }}_ENVIRONMENT=production` and list th
 | Lint | `uv run ruff check .` |
 | Format | `uv run ruff format .` |
 | Type-check | `uv run mypy {{ package_name }}` |
-| Serve without reload | `uv run {{ package_name }} serve` |
 | Build sdist and wheel | `uv build` |
 | Install git hooks | `uvx pre-commit install` |
 
+{% if 'container' in components -%}
 ## Container
 
 ```bash
 docker build -t {{ project_name }} .
-docker run --rm -p 8000:8000 {{ project_name }}
+docker run --rm -p 8000:8000 -e {{ package_name|upper }}_ALLOWED_HOSTS='["localhost"]' {{ project_name }}
 ```
 
+Docker is optional: nothing in development or the tests needs it.
+
+{% endif -%}
 ## Project layout
 
 ```
 {{ package_name }}/
-  main.py          # application factory, /health, router registration
-  routers/         # HTTP endpoints (thin)
-  models.py        # SQLModel table model and API schemas
-  db.py            # engine and per-request session dependency
-  core/config.py   # typed settings
-  core/exceptions.py, core/middleware.py
-tests/             # pytest suite with an isolated in-memory database
+  api/             # HTTP: routers, request/response schemas, dependencies, errors, middleware
+  application/     # use cases (services) that orchestrate the domain through ports
+  domain/          # entities, rules, errors, and ports (Protocols); no framework imports
+  infrastructure/  # adapters implementing the ports{% if 'database' in components %} (database/ for SQLAlchemy){% endif %}
+{%- if 'auth' in components %}
+  security/        # principal, scopes, authenticator, audit, rate-limit seam
+{%- endif %}
+  bootstrap/       # settings, logging, the service container, create_app()
+{%- if 'database' in components %}
+migrations/        # Alembic revisions
+{%- endif %}
+tests/unit/        # domain, use cases, and adapters in isolation
+tests/integration/ # real request paths through the application
 ```
 
 ## License

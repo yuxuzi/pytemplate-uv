@@ -12,13 +12,15 @@ import yaml
 from copier import Settings, run_update
 from copier.errors import CopierError
 
-from pytemplate.profiles import get_profile, resolve_components
+from pytemplate.packs import BUNDLED, TemplateSource, open_catalog
+from pytemplate.profiles import Catalog, Profile
 from pytemplate.rendering import (
     ANSWERS_FILE,
     MANIFEST_FILE,
     generator_version,
     write_generation_manifest,
 )
+from pytemplate.resolution import Resolution, resolve
 
 
 class UpdateError(RuntimeError):
@@ -48,7 +50,7 @@ def _read_answers(project_path: Path) -> dict[str, object]:
     answers_path = project_path / ANSWERS_FILE
     if not answers_path.is_file():
         raise UpdateError(
-            f"{answers_path} not found. Only projects created by pytemplate-uv 2.1 or later can be "
+            f"{answers_path} not found. Only projects created by pytemplate-uv 3.0 or later can be "
             "updated; regenerate an older project with the same answers and move your changes over."
         )
     answers = yaml.safe_load(answers_path.read_text(encoding="utf-8")) or {}
@@ -96,19 +98,68 @@ def _require_clean_git_tree(project_path: Path) -> None:
         )
 
 
-def _refresh_manifest(project_path: Path) -> None:
+def _read_manifest(project_path: Path) -> dict[str, object]:
     manifest_path = project_path / MANIFEST_FILE
     if not manifest_path.is_file():
-        return
-    manifest = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
-    profile = get_profile(str(manifest["profile"]["id"]))
-    component_ids = tuple(str(entry["id"]) for entry in manifest.get("components", []))
-    write_generation_manifest(
-        project_path,
-        profile,
-        resolve_components(profile, component_ids),
-        files=_project_files(project_path),
+        return {}
+    return tomllib.loads(manifest_path.read_text(encoding="utf-8"))
+
+
+def _manifest_source(manifest: dict[str, object], answers: dict[str, object]) -> TemplateSource:
+    """Return the template source a project was generated from (v1 manifests are bundled)."""
+    template = manifest.get("template")
+    if isinstance(template, dict) and template.get("kind", BUNDLED) != BUNDLED:
+        return TemplateSource(
+            kind=str(template["kind"]),
+            location=str(template["source"]),
+            ref=str(template["ref"]) if template.get("ref") else None,
+            pack_id=str(template.get("pack", "")) or None,
+            pack_version=str(template.get("pack_version", "")) or None,
+        )
+    return TemplateSource(kind=BUNDLED, location=str(answers.get("_src_path", "")))
+
+
+def _legacy_components(profile: Profile, manifest: dict[str, object]) -> list[str]:
+    """Return the components a project generated before 3.0 implicitly contains."""
+    recorded = manifest.get("components", [])
+    ids = (
+        [str(entry["id"]) for entry in recorded if isinstance(entry, dict)]
+        if isinstance(recorded, list)
+        else []
     )
+    return sorted({*ids, *profile.default_components, *profile.legacy_components})
+
+
+def _resolution_for(catalog: Catalog, profile: Profile, component_ids: list[str]) -> Resolution:
+    """Rebuild a resolution from recorded components, keeping only the explicit choices."""
+    components = catalog.component_map()
+    required = {
+        needed
+        for identifier in component_ids
+        if identifier in components
+        for needed in components[identifier].requires
+    }
+    requested = tuple(
+        identifier
+        for identifier in component_ids
+        if identifier not in profile.default_components and identifier not in required
+    )
+    return resolve(profile, requested, components)
+
+
+def _refresh_manifest(project_path: Path, source: TemplateSource, to_ref: str) -> None:
+    manifest = _read_manifest(project_path)
+    if not manifest:
+        return
+    answers = yaml.safe_load((project_path / ANSWERS_FILE).read_text(encoding="utf-8")) or {}
+    pack = None if source.is_bundled else source.location
+    with open_catalog(pack, to_ref if pack else None) as (catalog, opened, _):
+        profile = catalog.profile(str(answers.get("profile") or manifest["profile"]["id"]))  # type: ignore[index]
+        resolution = _resolution_for(catalog, profile, list(answers.get("components", [])))
+        recorded = opened if pack else TemplateSource(BUNDLED, source.location, to_ref)
+        write_generation_manifest(
+            project_path, resolution, recorded, files=_project_files(project_path)
+        )
 
 
 def update(request: UpdateRequest) -> UpdateResult:
@@ -119,11 +170,24 @@ def update(request: UpdateRequest) -> UpdateResult:
     answers = _read_answers(project_path)
     _require_clean_git_tree(project_path)
 
+    manifest = _read_manifest(project_path)
+    source = _manifest_source(manifest, answers)
     version = generator_version()
+    if request.to_ref is None and not source.is_bundled:
+        raise UpdateError(
+            f"This project was generated from the template pack '{source.location}'; pass "
+            "--to with the pack tag to update to."
+        )
     to_ref = request.to_ref or f"v{version}"
     if request.to_ref is None and version == "uninstalled":
         raise UpdateError("Cannot infer the target version from a source checkout; pass --to.")
     from_ref = answers.get("_commit")
+    data: dict[str, object] = {}
+    if "components" not in answers and source.is_bundled and manifest:
+        # Projects from 2.x never recorded components; keep everything they contain.
+        with open_catalog() as (catalog, _, _):
+            profile = catalog.profile(str(manifest["profile"]["id"]))  # type: ignore[index]
+        data["components"] = _legacy_components(profile, manifest)
 
     try:
         run_update(
@@ -136,12 +200,13 @@ def update(request: UpdateRequest) -> UpdateResult:
             pretend=not request.apply,
             quiet=request.apply,
             unsafe=False,
+            data=data,
         )
     except (CopierError, ValueError, subprocess.CalledProcessError) as error:
         raise UpdateError(f"Copier could not update {project_path}: {error}") from error
 
     if request.apply:
-        _refresh_manifest(project_path)
+        _refresh_manifest(project_path, source, to_ref)
     return UpdateResult(
         project_path=project_path,
         from_ref=str(from_ref) if from_ref is not None else None,

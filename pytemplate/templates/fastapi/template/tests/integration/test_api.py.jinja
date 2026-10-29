@@ -1,0 +1,111 @@
+"""Real request paths through middleware, routing, use cases, and the storage adapter."""
+
+from httpx import ASGITransport, AsyncClient
+
+from {{ package_name }}.bootstrap.app import create_app
+from {{ package_name }}.bootstrap.container import Container
+
+EXAMPLES = "/api/v1/examples"
+
+
+async def _create(client: AsyncClient, name: str = "Alpha") -> dict[str, object]:
+    response = await client.post(EXAMPLES, json={"name": name, "description": "An example"})
+    assert response.status_code == 201, response.text
+    body: dict[str, object] = response.json()
+    return body
+
+
+async def test_liveness_reports_version_and_security_headers(client: AsyncClient) -> None:
+    response = await client.get("/health/live")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok", "version": "0.1.0"}
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Request-ID"]
+
+
+async def test_readiness_is_ok_when_every_check_passes(client: AsyncClient) -> None:
+    response = await client.get("/health/ready")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+
+
+async def test_crud_round_trip(client: AsyncClient) -> None:
+    created = await _create(client)
+    path = f"{EXAMPLES}/{created['id']}"
+
+    patched = await client.patch(path, json={"is_active": False})
+    listed = await client.get(EXAMPLES, params={"limit": 10})
+    deleted = await client.delete(path)
+    missing = await client.get(path)
+
+    assert patched.json()["is_active"] is False
+    assert patched.json()["updated_at"] is not None
+    assert [item["name"] for item in listed.json()] == ["Alpha"]
+    assert deleted.status_code == 204
+    assert missing.status_code == 404
+
+
+async def test_pagination(client: AsyncClient) -> None:
+    for index in range(3):
+        await _create(client, f"Example {index}")
+
+    page = await client.get(EXAMPLES, params={"offset": 2, "limit": 2})
+
+    assert [item["name"] for item in page.json()] == ["Example 2"]
+
+
+async def test_validation_errors_use_the_envelope_without_echoing_input(
+    client: AsyncClient,
+) -> None:
+    response = await client.post(EXAMPLES, json={"name": "", "description": "secret-value"})
+
+    error = response.json()["error"]
+    assert response.status_code == 422
+    assert error["code"] == "VALIDATION_ERROR"
+    assert error["details"]["errors"][0]["loc"] == ["body", "name"]
+    assert "secret-value" not in response.text
+
+
+async def test_not_found_uses_the_envelope_with_the_request_id(client: AsyncClient) -> None:
+    response = await client.get(f"{EXAMPLES}/999")
+
+    error = response.json()["error"]
+    assert response.status_code == 404
+    assert error["code"] == "NOT_FOUND"
+    assert error["request_id"] == response.headers["X-Request-ID"]
+
+
+async def test_a_safe_incoming_request_id_is_kept(client: AsyncClient) -> None:
+    kept = await client.get("/health/live", headers={"X-Request-ID": "trace-123"})
+    replaced = await client.get("/health/live", headers={"X-Request-ID": "bad id\n"})
+
+    assert kept.headers["X-Request-ID"] == "trace-123"
+    assert replaced.headers["X-Request-ID"] != "bad id\n"
+
+
+async def test_untrusted_host_is_rejected_except_for_health_probes(client: AsyncClient) -> None:
+    rejected = await client.get(EXAMPLES, headers={"Host": "evil.example"})
+    probe = await client.get("/health/live", headers={"Host": "10.0.0.7:8000"})
+
+    assert rejected.status_code == 400
+    assert rejected.json()["error"]["code"] == "BAD_REQUEST"
+    assert probe.status_code == 200
+
+
+async def test_unexpected_errors_become_a_500_envelope(container: Container) -> None:
+    app = create_app(container.settings, container)
+
+    async def boom() -> None:
+        raise RuntimeError("database password is hunter2")
+
+    app.add_api_route("/boom", boom)
+    transport = ASGITransport(app=app, raise_app_exceptions=False)
+    async with AsyncClient(transport=transport, base_url="http://localhost") as other:
+        response = await other.get("/boom")
+
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "INTERNAL_ERROR"
+    assert "hunter2" not in response.text
+    assert response.headers["X-Request-ID"]

@@ -5,6 +5,7 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
+from pytemplate.packs import is_git_source
 from pytemplate.rendering import DEFAULT_TEMPLATE_SOURCE, RenderRequest
 
 
@@ -21,6 +22,8 @@ _ALLOWED_KEYS = {
     "overwrite",
     "data",
     "template_source",
+    "template",
+    "template_ref",
 }
 
 
@@ -36,6 +39,24 @@ def _template_source(value: object) -> str:
     if not isinstance(value, str) or not value:
         raise ConfigurationError("Configuration key 'template_source' must be a non-empty string.")
     return value
+
+
+def _optional_string(data: dict[str, object], key: str) -> str | None:
+    value = data.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise ConfigurationError(f"Configuration key '{key}' must be a non-empty string.")
+    return value
+
+
+def _template(data: dict[str, object], base: Path) -> str | None:
+    """Return the optional pack source; relative pack directories resolve against ``base``."""
+    template = _optional_string(data, "template")
+    if template is None or is_git_source(template):
+        return template
+    path = Path(template).expanduser()
+    return str(path if path.is_absolute() else base / path)
 
 
 def load_render_request(path: Path, *, dry_run: bool = False) -> RenderRequest:
@@ -74,6 +95,7 @@ def load_render_request(path: Path, *, dry_run: bool = False) -> RenderRequest:
         raise ConfigurationError(
             "Configuration keys 'no_input' and 'overwrite' must be boolean values."
         )
+    template = _template(data, config_path.parent)
     return RenderRequest(
         profile_id=profile,
         project_name=project_name,
@@ -84,4 +106,6 @@ def load_render_request(path: Path, *, dry_run: bool = False) -> RenderRequest:
         dry_run=dry_run,
         data=_template_data(data.get("data", {})),
         template_source=_template_source(data.get("template_source", DEFAULT_TEMPLATE_SOURCE)),
+        template=template,
+        template_ref=_optional_string(data, "template_ref"),
     )

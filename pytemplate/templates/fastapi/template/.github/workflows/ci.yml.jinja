@@ -21,8 +21,8 @@ jobs:
 ]
     runs-on: {% raw %}${{ matrix.os }}{% endraw %}
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.2
         with:
           python-version: {% raw %}${{ matrix.python-version }}{% endraw %}
       - run: uv sync

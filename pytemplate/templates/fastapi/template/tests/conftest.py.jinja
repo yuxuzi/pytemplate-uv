@@ -1,35 +1,189 @@
-"""Shared fixtures: an isolated in-memory database and an HTTP client."""
+"""Shared fixtures: isolated settings, a service container, and HTTP clients.
+
+Nothing here touches the network, a real identity provider, or a shared database.
+"""
+
+{%- if 'auth-oidc' in components %}
+
+import time
+from collections.abc import AsyncIterator, Callable
+from dataclasses import replace
+{%- else %}
 
 from collections.abc import AsyncIterator
+{%- endif %}
+from pathlib import Path
 
+{% if 'auth-oidc' in components -%}
+import jwt
+{% endif -%}
 import pytest
+{%- if 'database' in components %}
+from alembic import command
+from alembic.config import Config
+{%- endif %}
+{%- if 'auth-oidc' in components %}
+from cryptography.hazmat.primitives.asymmetric import rsa
+{%- endif %}
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy.pool import StaticPool
-from sqlmodel import SQLModel
-from sqlmodel.ext.asyncio.session import AsyncSession
 
-from {{ package_name }}.db import get_session
-from {{ package_name }}.main import app
+from {{ package_name }}.bootstrap.app import create_app
+from {{ package_name }}.bootstrap.container import (
+    Container,
+    build_container,
+)
+from {{ package_name }}.bootstrap.settings import {% if 'auth-api-key' in components %}ApiKey, {% endif %}Settings
+{%- if 'auth-api-key' in components %}
+from {{ package_name }}.security.api_key import (
+    API_KEY_HEADER,
+    hash_api_key,
+)
+{%- endif %}
+{%- if 'auth-oidc' in components %}
+from {{ package_name }}.security.oidc import OidcAuthenticator
+{%- endif %}
+
+ROOT = Path(__file__).resolve().parents[1]
+ALL_SCOPES = ("examples:read", "examples:write", "jobs")
+{%- if 'auth-api-key' in components %}
+# Synthetic keys: they exist only in these tests.
+TEST_KEY = "test-key-not-a-secret"
+READER_KEY = "reader-key-not-a-secret"
+{%- endif %}
+{%- if 'auth-oidc' in components %}
+ISSUER = "https://issuer.test"
+AUDIENCE = "{{ project_name }}"
+{%- endif %}
 
 
 @pytest.fixture
-async def session() -> AsyncIterator[AsyncSession]:
-    engine = create_async_engine("sqlite+aiosqlite://", poolclass=StaticPool)
-    async with engine.begin() as connection:
-        await connection.run_sync(SQLModel.metadata.create_all)
-    async with AsyncSession(engine, expire_on_commit=False) as db_session:
-        yield db_session
-    await engine.dispose()
+def settings(tmp_path: Path) -> Settings:
+    """Settings for one test, ignoring `.env` and the process environment's defaults."""
+    return Settings(
+        _env_file=None,
+        ENVIRONMENT="test",
+        LOG_FORMAT="text",
+{%- if 'database' in components %}
+        DATABASE_URL=f"sqlite+aiosqlite:///{(tmp_path / 'test.db').as_posix()}",
+{%- endif %}
+{%- if 'auth-api-key' in components %}
+        API_KEYS=[
+            ApiKey(name="tests", sha256=hash_api_key(TEST_KEY), scopes=list(ALL_SCOPES)),
+            ApiKey(name="reader", sha256=hash_api_key(READER_KEY), scopes=["examples:read"]),
+        ],
+{%- endif %}
+{%- if 'auth-oidc' in components %}
+        OIDC_ISSUER=ISSUER,
+        OIDC_AUDIENCE=AUDIENCE,
+        OIDC_JWKS_URL="https://issuer.test/jwks",
+{%- endif %}
+    )
+{%- if 'database' in components %}
+
+
+def alembic_config(url: str) -> Config:
+    """Return an Alembic config that migrates `url` without reconfiguring logging."""
+    config = Config(str(ROOT / "alembic.ini"))
+    config.attributes["database_url"] = url
+    config.attributes["configure_logging"] = False
+    return config
 
 
 @pytest.fixture
-async def client(session: AsyncSession) -> AsyncIterator[AsyncClient]:
-    async def override_session() -> AsyncIterator[AsyncSession]:
-        yield session
+def migrated(settings: Settings) -> Settings:
+    """Apply every migration to this test's private SQLite file."""
+    command.upgrade(alembic_config(settings.DATABASE_URL.get_secret_value()), "head")
+    return settings
+{%- endif %}
+{%- if 'auth-oidc' in components %}
 
-    app.dependency_overrides[get_session] = override_session
-    transport = ASGITransport(app=app)
+
+@pytest.fixture(scope="session")
+def signing_key() -> rsa.RSAPrivateKey:
+    """A throwaway RSA key standing in for the identity provider's."""
+    return rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+
+@pytest.fixture
+def make_token(signing_key: rsa.RSAPrivateKey) -> Callable[..., str]:
+    """Return a factory for signed tokens; override any claim to build invalid ones."""
+
+    def make(
+        *,
+        scopes: tuple[str, ...] = ALL_SCOPES,
+        subject: str = "user-1",
+        audience: str = AUDIENCE,
+        issuer: str = ISSUER,
+        expires_in: int = 300,
+        key: object = None,
+        algorithm: str = "RS256",
+    ) -> str:
+        now = int(time.time())
+        claims = {
+            "sub": subject,
+            "iss": issuer,
+            "aud": audience,
+            "iat": now,
+            "exp": now + expires_in,
+            "scope": " ".join(scopes),
+        }
+        return jwt.encode(claims, key or signing_key, algorithm=algorithm)
+
+    return make
+{%- endif %}
+
+
+@pytest.fixture
+async def container(
+    {% if 'database' in components %}migrated{% else %}settings{% endif %}: Settings,
+{%- if 'auth-oidc' in components %}
+    signing_key: rsa.RSAPrivateKey,
+{%- endif %}
+) -> AsyncIterator[Container]:
+    """The real container{% if 'auth-oidc' in components %}, with the test key standing in for the JWKS endpoint{% endif %}."""
+    built = build_container({% if 'database' in components %}migrated{% else %}settings{% endif %})
+{%- if 'auth-oidc' in components %}
+    public_key = signing_key.public_key()
+    built = replace(
+        built,
+        authenticator=OidcAuthenticator(
+            issuer=ISSUER,
+            audience=AUDIENCE,
+            algorithms=["RS256"],
+            key_for_token=lambda _token: public_key,
+        ),
+    )
+{%- endif %}
+    yield built
+    for close in reversed(built.shutdown):
+        await close()
+
+
+@pytest.fixture
+def auth_headers({% if 'auth-oidc' in components %}make_token: Callable[..., str]{% endif %}) -> dict[str, str]:
+    """Credentials with every scope{% if 'auth' not in components %}; empty because this service has no auth{% endif %}."""
+{%- if 'auth-api-key' in components %}
+    return {API_KEY_HEADER: TEST_KEY}
+{%- elif 'auth-oidc' in components %}
+    return {"Authorization": f"Bearer {make_token()}"}
+{%- else %}
+    return {}
+{%- endif %}
+
+
+@pytest.fixture
+async def client(container: Container, auth_headers: dict[str, str]) -> AsyncIterator[AsyncClient]:
+    """An HTTP client calling the real application in process."""
+    transport = ASGITransport(app=create_app(container.settings, container))
+    async with AsyncClient(
+        transport=transport, base_url="http://localhost", headers=auth_headers
+    ) as http:
+        yield http
+
+
+@pytest.fixture
+async def anonymous(container: Container) -> AsyncIterator[AsyncClient]:
+    """An HTTP client without credentials."""
+    transport = ASGITransport(app=create_app(container.settings, container))
     async with AsyncClient(transport=transport, base_url="http://localhost") as http:
         yield http
-    app.dependency_overrides.clear()

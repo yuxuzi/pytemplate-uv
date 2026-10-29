@@ -1,13 +1,13 @@
 [project]
 name = "pytemplate-uv"
-version = "2.1.0"
-description = "A deterministic CLI that generates uv-native Python and FastAPI projects from Copier templates."
+version = "3.0.0"
+description = "A deterministic application factory: uv-native Python and FastAPI projects from profiles, composable components, and template packs."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Leo Liu", email = "yuxuzi@gmail.com" }]
-keywords = ["uv", "copier", "template", "project-generator", "scaffold", "fastapi", "cli"]
+keywords = ["uv", "copier", "template", "project-generator", "scaffold", "fastapi", "cli", "sqlalchemy", "alembic", "oidc"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
@@ -38,6 +38,7 @@ Changelog = "https://github.com/yuxuzi/pytemplate-uv/blob/main/CHANGELOG.md"
 [project.scripts]
 pytemplate = "pytemplate.main:app"
 pytemplate-uv = "pytemplate.main:app"
+create-project = "pytemplate.main:create_project_app"
 
 [dependency-groups]
 dev = [
@@ -55,7 +56,7 @@ build-backend = "uv_build"
 [tool.uv.build-backend]
 module-name = "pytemplate"
 module-root = ""
-source-include = ["tests/**", "CHANGELOG.md"]
+source-include = ["tests/**", "docs/**", "CHANGELOG.md"]
 
 [tool.ruff]
 line-length = 100

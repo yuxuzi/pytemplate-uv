@@ -1,0 +1,47 @@
+# Security model
+
+This service authenticates callers with
+{%- if 'auth-api-key' in components %} **API keys** (header `X-API-Key`), intended for
+service-to-service calls.
+{%- else %} **OpenID Connect bearer tokens** (`Authorization: Bearer <JWT>`) issued by your
+identity provider.
+{%- endif %}
+
+## Assumptions
+
+- TLS terminates in front of the service (load balancer, ingress, or reverse proxy). Credentials
+  must never travel over plain HTTP.
+- `{{ package_name|upper }}_ALLOWED_HOSTS` lists the real host names, and
+  `{{ package_name|upper }}_CORS_ORIGINS` lists only browser origins you control. Production
+  settings refuse wildcards, localhost, and `DEBUG`.
+{%- if 'auth-api-key' in components %}
+- Only SHA-256 hashes of keys are configured (`{{ package_name|upper }}_API_KEYS`). Keys are
+  random, high-entropy strings: generate them with a password manager or `openssl rand -hex 32`,
+  and hash them with `uv run {{ package_name }} hash-api-key`.
+{%- else %}
+- The identity provider is trusted to authenticate users. The service checks the token's
+  signature against `{{ package_name|upper }}_OIDC_JWKS_URL`, plus `iss`, `aud`, `exp`, and `sub`,
+  and accepts only asymmetric algorithms.
+{%- endif %}
+- Scopes are the unit of authorization: `examples:read`, `examples:write`, and `jobs`. Routes
+  declare them with `require_scopes(...)`; handlers never parse credentials.
+
+## Deployment responsibilities
+
+- Supply secrets from the deployment environment or a secret manager, never from files in the
+  repository or the image.
+- Rotate credentials: {% if 'auth-api-key' in components %}add the new key's hash, deploy, move
+  clients over, then remove the old hash{% else %}rely on the provider's key rotation; signing keys
+  are fetched from the JWKS endpoint{% endif %}.
+- Send the `audit` logger to durable storage; it records allowed and denied decisions without
+  credentials.
+- Replace `NoRateLimit` with a shared-store limiter before relying on rate limits.
+
+## Out of scope
+
+Password storage, account registration, password reset, and multi-tenant entitlements. Use an
+identity provider for user accounts.
+
+## Reporting a vulnerability
+
+Report suspected vulnerabilities privately to {{ email }}; do not open a public issue.

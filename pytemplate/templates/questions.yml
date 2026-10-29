@@ -74,3 +74,21 @@ license:
     Use an SPDX license expression such as MIT or Apache-2.0.
     {% endif %}
   default: MIT
+
+# Set by pytemplate from the profile defaults plus --component (always passed as data, so never
+# prompted). Recorded in .copier-answers.yml so `copier update` keeps the same components.
+components:
+  type: str
+  help: Components to include
+  multiselect: true
+  choices:
+    - api
+    - auth
+    - auth-api-key
+    - auth-oidc
+    - cli
+    - container
+    - database
+    - worker
+  default: []
+

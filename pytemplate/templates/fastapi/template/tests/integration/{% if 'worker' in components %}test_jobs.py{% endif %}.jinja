@@ -1,0 +1,27 @@
+"""Job endpoints: submit, then poll."""
+
+from httpx import AsyncClient
+
+from {{ package_name }}.bootstrap.container import Container
+from {{ package_name }}.infrastructure.tasks import InProcessTaskQueue
+
+
+async def test_submit_then_poll_the_result(client: AsyncClient, container: Container) -> None:
+    await client.post("/api/v1/examples", json={"name": "a", "description": "d"})
+
+    submitted = await client.post("/api/v1/jobs/example-count")
+    assert isinstance(container.tasks, InProcessTaskQueue)
+    await container.tasks.drain()
+    polled = await client.get(f"/api/v1/jobs/{submitted.json()['id']}")
+
+    assert submitted.status_code == 202
+    assert submitted.json()["state"] in {"queued", "running"}
+    assert polled.json()["state"] == "succeeded"
+    assert polled.json()["result"] == {"examples": 1}
+
+
+async def test_unknown_job_is_404(client: AsyncClient) -> None:
+    response = await client.get("/api/v1/jobs/missing")
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "NOT_FOUND"

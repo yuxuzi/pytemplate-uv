@@ -9,7 +9,7 @@ import pytest
 
 import pytemplate.rendering as rendering
 from pytemplate.profiles import get_profile
-from pytemplate.rendering import RenderError, RenderRequest, render
+from pytemplate.rendering import RenderError, RenderRequest, RequestError, render
 
 PROFILES = ("python", "fastapi")
 SOURCE_ROOT = Path(__file__).parent.parent / "pytemplate"
@@ -135,7 +135,7 @@ def test_failed_render_leaves_no_partial_output(
 
 @pytest.mark.parametrize("profile", PROFILES)
 def test_generated_projects_depend_only_on_uv(profile: str, tmp_path: Path) -> None:
-    project = _render(profile, tmp_path)
+    project = _render(profile, tmp_path, components=("container",))
     tree = _tree(project)
 
     assert not [name for name in tree if Path(name).name == "Makefile"]
@@ -176,6 +176,6 @@ def test_package_name_override_is_validated(tmp_path: Path) -> None:
     [{"description": 'Say "hi"'}, {"license": "not a license!"}, {"python_version": "3.9"}],
 )
 def test_template_validators_reject_unsafe_answers(data: dict[str, str], tmp_path: Path) -> None:
-    with pytest.raises(RenderError, match="Copier could not render"):
+    with pytest.raises(RequestError, match="Copier rejected the answers"):
         _render("python", tmp_path, data=data)
     assert list(tmp_path.iterdir()) == []

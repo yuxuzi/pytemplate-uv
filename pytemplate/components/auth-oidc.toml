@@ -1,0 +1,38 @@
+contract = 1
+id = "auth-oidc"
+name = "OpenID Connect authentication"
+description = "Bearer JWT validation against an OpenID Connect provider's JWKS, with issuer, audience, expiry, and algorithm checks."
+version = "1"
+status = "stable"
+compatible_profiles = ["fastapi"]
+requires = ["auth"]
+conflicts = ["auth-api-key"]
+dependencies = ["pyjwt[crypto]>=2.10"]
+paths = ["{package}/security/oidc.py", "tests/integration/test_oidc_auth.py"]
+security_notes = [
+    "Only the configured algorithms are accepted; 'none' and HMAC algorithms are refused.",
+    "Signing keys are fetched from OIDC_JWKS_URL on first use, never at render or import time.",
+]
+
+[[settings]]
+name = "OIDC_ISSUER"
+type = "str"
+description = "Expected iss claim."
+required_in_production = true
+
+[[settings]]
+name = "OIDC_AUDIENCE"
+type = "str"
+description = "Expected aud claim."
+required_in_production = true
+
+[[settings]]
+name = "OIDC_JWKS_URL"
+type = "str"
+description = "The provider's JWKS endpoint."
+required_in_production = true
+
+[[settings]]
+name = "OIDC_ALGORITHMS"
+type = "list"
+description = "Accepted signing algorithms (default RS256)."

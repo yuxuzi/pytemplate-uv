@@ -1,0 +1,63 @@
+"""Migrations and the SQL adapters, on a private SQLite file per test."""
+
+from datetime import UTC, datetime
+
+from alembic import command
+from httpx import ASGITransport, AsyncClient
+
+from {{ package_name }}.bootstrap.app import create_app
+from {{ package_name }}.bootstrap.container import Container
+from {{ package_name }}.bootstrap.settings import Settings
+from {{ package_name }}.domain.examples import NewExample
+from {{ package_name }}.infrastructure.database.engine import Database
+
+from ..conftest import alembic_config
+
+NOW = datetime(2026, 1, 2, tzinfo=UTC)
+
+
+def test_migrations_are_repeatable_and_match_the_models(settings: Settings) -> None:
+    config = alembic_config(settings.DATABASE_URL.get_secret_value())
+
+    command.upgrade(config, "head")
+    command.upgrade(config, "head")
+    command.check(config)
+    command.downgrade(config, "base")
+    command.upgrade(config, "head")
+
+
+async def test_repository_round_trip_and_rollback(container: Container) -> None:
+    async with container.unit_of_work() as uow:
+        created = await uow.examples.add(NewExample("a", "d", ("x",)), created_at=NOW)
+        await uow.commit()
+    async with container.unit_of_work() as uow:
+        await uow.examples.add(NewExample("discarded", "d"), created_at=NOW)
+
+    async with container.unit_of_work() as uow:
+        stored = await uow.examples.get(created.id)
+        count = await uow.examples.count()
+
+    assert stored == created
+    assert stored.created_at.tzinfo is not None
+    assert count == 1
+
+
+async def test_data_persists_across_requests(client: AsyncClient) -> None:
+    await client.post("/api/v1/examples", json={"name": "kept", "description": "d"})
+
+    listed = await client.get("/api/v1/examples")
+
+    assert [item["name"] for item in listed.json()] == ["kept"]
+
+
+async def test_readiness_fails_when_the_database_is_unreachable(container: Container) -> None:
+    broken = Database("sqlite+aiosqlite:////nonexistent-dir/x.db")
+    container.readiness_checks["database"] = broken.ping
+
+    transport = ASGITransport(app=create_app(container.settings, container))
+    async with AsyncClient(transport=transport, base_url="http://localhost") as http:
+        response = await http.get("/health/ready")
+    await broken.dispose()
+
+    assert response.status_code == 503
+    assert response.json() == {"status": "unavailable", "checks": {"database": "failed"}}

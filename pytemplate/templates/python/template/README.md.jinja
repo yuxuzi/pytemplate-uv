@@ -30,6 +30,7 @@ uv run {{ package_name }} hello --name World
 Add runtime dependencies with `uv add <package>` and development tools with
 `uv add --dev <package>`.
 
+{% if 'container' in components -%}
 ## Container
 
 ```bash
@@ -37,6 +38,7 @@ docker build -t {{ project_name }} .
 docker run --rm {{ project_name }} hello --name World
 ```
 
+{% endif -%}
 ## Project layout
 
 ```

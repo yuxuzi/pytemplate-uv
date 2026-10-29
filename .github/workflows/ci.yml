@@ -12,8 +12,8 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.2
       - run: uv sync --locked
       - run: uv run ruff check .
       - run: uv run ruff format --check pytemplate tests
@@ -27,26 +27,29 @@ jobs:
         python-version: ["3.11", "3.12", "3.13", "3.14"]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.2
         with:
           python-version: ${{ matrix.python-version }}
       - run: uv sync --locked
       - run: uv run pytest
 
   generated-projects:
-    # Render every profile and run its own lifecycle commands (sync, lint, format, mypy, tests).
+    # Render every distinct component set of each profile and run its own lifecycle commands
+    # (sync, lint, format, strict mypy, tests, and component commands such as migrations).
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
         python-version: ["3.11", "3.14"]
+        profile: [python, fastapi]
     runs-on: ${{ matrix.os }}
     env:
       PYTEMPLATE_SMOKE: "1"
+      PYTEMPLATE_SMOKE_PROFILE: ${{ matrix.profile }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.2
         with:
           python-version: ${{ matrix.python-version }}
       - run: uv sync --locked
@@ -55,22 +58,36 @@ jobs:
   package:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.2
       - run: uv build
       - run: uvx twine check --strict dist/*
-      - name: Generate projects from the built wheel
+      - name: Inspect, plan, and generate every profile and component from the built wheel
         run: |
           wheel="$(ls dist/*.whl)"
-          for profile in python fastapi; do
-            uvx --from "$wheel" pytemplate create "wheel-$profile" --profile "$profile" \
-              --output-dir "$RUNNER_TEMP" --no-input
+          pt() { uvx --from "$wheel" pytemplate "$@"; }
+          pt list-profiles --json > /dev/null
+          for component in $(pt list-components --json | jq -r '.[].identifier'); do
+            pt describe-component "$component" --json > /dev/null
+          done
+          for schema in profile component pack request manifest; do pt schema "$schema" > /dev/null; done
+          create() {
+            name="$1"; shift
+            pt plan --name "$name" -o "$RUNNER_TEMP" "$@" --json > /dev/null
+            pt create "$name" -o "$RUNNER_TEMP" --no-input "$@"
             for path in .gitignore .github/workflows/ci.yml CLAUDE.md .pytemplate.toml \
                 .copier-answers.yml; do
-              test -f "$RUNNER_TEMP/wheel-$profile/$path"
+              test -f "$RUNNER_TEMP/$name/$path"
             done
-          done
-      - uses: actions/upload-artifact@v4
+          }
+          create wheel-python --profile python -c container
+          create wheel-fastapi --profile fastapi
+          create wheel-fastapi-keys --profile fastapi -c database -c worker -c container -c auth-api-key
+          create wheel-fastapi-oidc --profile fastapi -c database -c auth-oidc
+          test -f "$RUNNER_TEMP/wheel-fastapi-keys/alembic.ini"
+          test -f "$RUNNER_TEMP/wheel-fastapi-keys/Dockerfile"
+          test -f "$RUNNER_TEMP/wheel-fastapi-oidc/SECURITY.md"
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/

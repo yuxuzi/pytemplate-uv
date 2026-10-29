@@ -44,9 +44,15 @@ def test_skill_install_writes_and_refuses_to_overwrite(tmp_path: Path) -> None:
 def test_skill_only_references_existing_cli_commands() -> None:
     commands = set(re.findall(r"uvx pytemplate-uv ([a-z][a-z-]+)", skill_text()))
 
-    assert {"list-profiles", "describe-profile", "validate", "create-from-config", "update"} <= (
-        commands
-    )
+    assert {
+        "list-profiles",
+        "describe-profile",
+        "list-components",
+        "describe-component",
+        "plan",
+        "create-from-config",
+        "update",
+    } <= commands
     for command in commands:
         result = runner.invoke(app, [command, "--help"])
         assert result.exit_code == 0, f"{command}: {result.output}"
@@ -70,5 +76,14 @@ def test_list_json_outputs_parse() -> None:
     component = json.loads(runner.invoke(app, ["describe-component", "api", "--json"]).output)
 
     assert [profile["identifier"] for profile in profiles] == ["fastapi", "python"]
-    assert {item["identifier"] for item in components} == {"api", "cli", "database"}
+    assert {item["identifier"] for item in components} == {
+        "api",
+        "auth",
+        "auth-api-key",
+        "auth-oidc",
+        "cli",
+        "container",
+        "database",
+        "worker",
+    }
     assert component["compatible_profiles"] == ["fastapi"]
