@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/).
 
-## [3.0.0] — Unreleased
+## [3.0.0] — 2026-10-29
 
 3.0.0 is the first release since 2.0.0. It includes the unreleased 2.1 work, listed after the
 3.0 additions below. See [docs/compatibility.md](docs/compatibility.md) for the versioning and
