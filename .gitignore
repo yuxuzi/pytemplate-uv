@@ -79,3 +79,6 @@ logs/
 .env.production.local
 # Locally installed copy of the bundled agent skill
 .claude/skills/pytemplate/
+
+# Planning documents (development-only, not shipped)
+docs/plans/
