@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Added
+
+- `--template-commit` and `--template-digest` (`template_commit` and `template_digest` in request
+  files) refuse a git template pack whose tag moved or whose files changed, before any of it is
+  read.
+- Projects from a git pack record the commit and digest they were rendered from in
+  `.pytemplate.toml`, and `plan --json` reports them.
+
+### Changed
+
+- Git template packs are cloned without line-ending conversion, so a pack has the same bytes on
+  every machine.
+
 ## [3.0.0] — 2026-10-29
 
 3.0.0 is the first release since 2.0.0. It includes the unreleased 2.1 work, listed after the
