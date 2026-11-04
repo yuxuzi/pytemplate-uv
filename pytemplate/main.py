@@ -79,6 +79,20 @@ TemplateRefOption = Annotated[
     str | None,
     typer.Option("--template-ref", help="Git tag or branch of the --template pack"),
 ]
+TemplateCommitOption = Annotated[
+    str | None,
+    typer.Option(
+        "--template-commit",
+        help="Refuse the git pack unless --template-ref resolves to this full commit hash",
+    ),
+]
+TemplateDigestOption = Annotated[
+    str | None,
+    typer.Option(
+        "--template-digest",
+        help="Refuse the git pack unless its files match this SHA-256 digest",
+    ),
+]
 ProfileOption = Annotated[str, typer.Option("--profile", "-p", help="Profile identifier")]
 OutputOption = Annotated[Path, typer.Option("--output-dir", "-o", help="Existing parent directory")]
 NoInputOption = Annotated[
@@ -215,6 +229,8 @@ def _request(
     data: list[str] | None,
     template: str | None,
     template_ref: str | None,
+    template_commit: str | None = None,
+    template_digest: str | None = None,
     template_source: str = DEFAULT_TEMPLATE_SOURCE,
     no_input: bool = True,
     overwrite: bool = False,
@@ -235,6 +251,8 @@ def _request(
         template_source=template_source,
         template=template,
         template_ref=template_ref,
+        template_commit=template_commit,
+        template_digest=template_digest,
     )
 
 
@@ -283,6 +301,8 @@ def create(
     data: DataOption = None,
     template: TemplateOption = None,
     template_ref: TemplateRefOption = None,
+    template_commit: TemplateCommitOption = None,
+    template_digest: TemplateDigestOption = None,
     template_source: TemplateSourceOption = DEFAULT_TEMPLATE_SOURCE,
     as_json: JsonOption = False,
 ) -> None:
@@ -297,6 +317,8 @@ def create(
             data=data,
             template=template,
             template_ref=template_ref,
+            template_commit=template_commit,
+            template_digest=template_digest,
             template_source=template_source,
             no_input=no_input,
             overwrite=force,
@@ -508,6 +530,8 @@ def validate_config(
     data: DataOption = None,
     template: TemplateOption = None,
     template_ref: TemplateRefOption = None,
+    template_commit: TemplateCommitOption = None,
+    template_digest: TemplateDigestOption = None,
     as_json: JsonOption = False,
 ) -> None:
     """Validate a render request, including template answers, without writing the project."""
@@ -521,6 +545,8 @@ def validate_config(
             data=data,
             template=template,
             template_ref=template_ref,
+            template_commit=template_commit,
+            template_digest=template_digest,
             dry_run=True,
         )
         resolution, project_path = validate_request(request)
@@ -548,6 +574,8 @@ def plan_command(
     data: DataOption = None,
     template: TemplateOption = None,
     template_ref: TemplateRefOption = None,
+    template_commit: TemplateCommitOption = None,
+    template_digest: TemplateDigestOption = None,
     as_json: JsonOption = False,
 ) -> None:
     """Show the resolved components, dependencies, and exact files, without writing anything."""
@@ -562,6 +590,8 @@ def plan_command(
                 data=data,
                 template=template,
                 template_ref=template_ref,
+                template_commit=template_commit,
+                template_digest=template_digest,
             )
         )
     except (*_REQUEST_ERRORS, RenderError) as error:

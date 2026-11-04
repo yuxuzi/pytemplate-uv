@@ -24,6 +24,8 @@ _ALLOWED_KEYS = {
     "template_source",
     "template",
     "template_ref",
+    "template_commit",
+    "template_digest",
 }
 
 
@@ -108,4 +110,6 @@ def load_render_request(path: Path, *, dry_run: bool = False) -> RenderRequest:
         template_source=_template_source(data.get("template_source", DEFAULT_TEMPLATE_SOURCE)),
         template=template,
         template_ref=_optional_string(data, "template_ref"),
+        template_commit=_optional_string(data, "template_commit"),
+        template_digest=_optional_string(data, "template_digest"),
     )
