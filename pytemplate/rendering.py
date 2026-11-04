@@ -11,6 +11,7 @@ import shutil
 import sys
 import tempfile
 from collections.abc import Mapping, Sequence
+from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -81,6 +82,7 @@ class RenderRequest:
 
     ``template`` selects an external template pack (a directory or git source) and
     ``template_ref`` a git tag or branch of it; leave both unset for the bundled templates.
+    ``template_commit`` and ``template_digest`` refuse a git pack that no longer matches them.
     ``template_source`` is the git source recorded for bundled projects (for forks).
     """
 
@@ -95,6 +97,19 @@ class RenderRequest:
     template_source: str = DEFAULT_TEMPLATE_SOURCE
     template: str | None = None
     template_ref: str | None = None
+    template_commit: str | None = None
+    template_digest: str | None = None
+
+
+def _open_request_catalog(
+    request: RenderRequest,
+) -> AbstractContextManager[tuple[Catalog, TemplateSource, Path]]:
+    return open_catalog(
+        request.template,
+        request.template_ref,
+        commit=request.template_commit,
+        digest=request.template_digest,
+    )
 
 
 @dataclass(frozen=True)
@@ -203,7 +218,7 @@ def _check_target(request: RenderRequest, project_path: Path) -> None:
 
 def validate_request(request: RenderRequest) -> tuple[Resolution, Path]:
     """Validate a request without rendering and return its resolution and target path."""
-    with open_catalog(request.template, request.template_ref) as (catalog, _, _):
+    with _open_request_catalog(request) as (catalog, _, _):
         resolution, project_path = _validate(request, catalog)
     _check_target(request, project_path)
     return resolution, project_path
@@ -277,6 +292,8 @@ def write_generation_manifest(
         ("ref", source.ref),
         ("pack", source.pack_id),
         ("pack_version", source.pack_version),
+        ("commit", source.commit),
+        ("digest", source.digest),
     ):
         if value:
             lines.append(f"{key} = {_toml(value)}")
@@ -426,7 +443,7 @@ def plan(request: RenderRequest) -> RenderPlan:
 
     The project is rendered into a temporary directory that is always removed.
     """
-    with open_catalog(request.template, request.template_ref) as (catalog, opened, root):
+    with _open_request_catalog(request) as (catalog, opened, root):
         resolution, project_path = _validate(request, catalog)
         source = _source(request, opened)
         with tempfile.TemporaryDirectory(prefix="pytemplate-plan-") as scratch:
@@ -454,7 +471,7 @@ def plan(request: RenderRequest) -> RenderPlan:
 
 def render(request: RenderRequest) -> RenderResult:
     """Validate and render a profile with Copier, publishing the project only on success."""
-    with open_catalog(request.template, request.template_ref) as (catalog, opened, root):
+    with _open_request_catalog(request) as (catalog, opened, root):
         resolution, project_path = _validate(request, catalog)
         _check_target(request, project_path)
         source = _source(request, opened)

@@ -229,6 +229,13 @@ pytemplate create my-tool -p tool --template gh:org/my-pack --template-ref v1.2.
   - `_tasks`, `_migrations`, `_jinja_extensions`, and symlinks are rejected.
 - Pack-generated projects record the pack's source and tag, so
   `pytemplate update --to <tag>` works for them too.
+- Projects from a git pack also record the commit and digest they were rendered from. To refuse a
+  pack that changed, pin them:
+  ```bash
+  pytemplate create my-tool -p tool --template gh:org/my-pack --template-ref v1.2.0 \
+    --template-commit <commit> --template-digest <digest> --no-input
+  ```
+  `pytemplate update` fetches by tag and does not check a pin.
 - See [docs/compatibility.md](docs/compatibility.md) for the versioning rules.
 
 ## Update an existing project

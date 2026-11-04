@@ -36,7 +36,9 @@ Use the JSON output, not guesses:
 - Each component lists `requires` (added automatically), `requires_any` (pick one), `conflicts`,
   its dependencies, the files it owns, and the environment `settings` it reads.
 - If the user names a template pack, add `--template <dir or gh:org/repo>` (and
-  `--template-ref <tag>`) to every command, and set `template`/`template_ref` in the request.
+  `--template-ref <tag>`) to every command, and set `template`/`template_ref` in the request. If
+  they also give a commit or digest, pass `--template-commit` and `--template-digest` to `create`,
+  `plan`, and `validate`. Treat a refusal as a sign the pack changed; never drop the pin to get past it.
 
 Choose the profile from what the user wants to build:
 - `python`: a library or command-line tool.
