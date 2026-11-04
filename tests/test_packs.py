@@ -233,8 +233,9 @@ def _tagged_pack(pack: Path) -> str:
 
 
 def _git(directory: Path, *args: str) -> str:
+    identity = ["-c", "user.name=Test", "-c", "user.email=test@example.com"]
     return subprocess.run(
-        ["git", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", *args],
+        ["git", *identity, "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", *args],
         cwd=directory,
         check=True,
         capture_output=True,
