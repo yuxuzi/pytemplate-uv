@@ -92,6 +92,11 @@ uv tool install pytemplate-uv
 
 Requires Python 3.11–3.15. Runs on Linux, macOS, and Windows. Also available via `pip install pytemplate-uv`.
 
+**Upgrading from 2.0?** If `pytemplate create` fails with
+`Usage: pytemplate [OPTIONS] [project_name]`, an old 2.0 install comes first on your `PATH`.
+Run `which pytemplate` to find it, remove it (for a pip install,
+`python3 -m pip uninstall pytemplate-uv`), and then run `uv tool install pytemplate-uv`.
+
 ## Create a project
 
 ### 30-second quickstart
