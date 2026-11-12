@@ -13,7 +13,7 @@ uv-native projects. A project is built from:
   1);
 - optionally, an external **template pack**.
 
-It can also upgrade those projects later with `copier update`. It is published to PyPI as
+It is published to PyPI as
 `pytemplate-uv` and supports CPython 3.11–3.15 on Windows, macOS, and Linux. `uv` and `uvx` are
 the only required tools; never use pip, virtualenv activation, or make. The roadmap is
 [PLAN.md](PLAN.md), and the versioning rules are in
@@ -37,7 +37,7 @@ template change, also run the smoke tests. Report the real results.
 ## Layout
 
 - `pytemplate/main.py`: Typer commands (`create`, `plan`, `validate`, `create-from-config`,
-  `list-*`/`describe-*`, `schema`, `update`, `skill show|install`), with `--json` and exit codes 0, 1
+  `list-*`/`describe-*`, `schema`, `skill show|install`), with `--json` and exit codes 0, 1
   (invalid request), and 2 (render failure). Presentation only.
 - `pytemplate/api.py`: the supported Python interface; re-exports only.
 - `pytemplate/profiles.py`: strict loading of contract-1 manifests into a `Catalog`, plus
@@ -49,8 +49,6 @@ template change, also run the smoke tests. Report the real results.
   (directory or git source), safety checks, and `TemplateSource`.
 - `pytemplate/rendering.py`: request validation, `plan()`, Copier `run_copy` into a staging
   directory, atomic publish, answers-file source recording, and the schema-2 `.pytemplate.toml`.
-- `pytemplate/updating.py`: the `copier update` wrapper. It is a dry run by default, requires a
-  clean git tree, marks conflicts inline, and maps legacy components.
 - `pytemplate/schema.py`: published JSON Schemas; `tests/test_schema.py` keeps them in step.
 - `pytemplate/errors.py`: `RenderError`, `RequestError`, and `PackError`.
 - `pytemplate/configuration.py`: TOML render requests.
@@ -63,7 +61,6 @@ template change, also run the smoke tests. Report the real results.
     plain names. The renderer excludes the `paths` of unselected components, so never put
     `{% if %}` conditions in file names; that would also break Windows' path-length limit.
 - `pytemplate/components/<id>.toml`: component manifests.
-- `copier.yml` (repo root): the git entry point that `copier update` uses at `vX.Y.Z` tags.
 - `tests/`:
   - unit and CLI tests;
   - `test_composition.py`: every distinct component set renders exactly its components' owned

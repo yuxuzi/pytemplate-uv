@@ -1,6 +1,5 @@
-# Settings and questions shared by every profile. Included by pytemplate/templates/copier.yml
-# (bundled rendering) and by the repository-root copier.yml (`copier update` from git tags).
-# Templates must never declare _tasks or _migrations. To keep `copier update` working, add
+# Settings and questions shared by every profile. Included by pytemplate/templates/copier.yml.
+# Templates must never declare _tasks or _migrations. Request files pass answers by name, so add
 # questions rather than renaming or removing them.
 _min_copier_version: "9.4"
 _templates_suffix: .jinja
@@ -77,7 +76,7 @@ license:
   default: MIT
 
 # Set by pytemplate from the profile defaults plus --component (always passed as data, so never
-# prompted). Recorded in .copier-answers.yml so `copier update` keeps the same components.
+# prompted). Recorded in .copier-answers.yml.
 components:
   type: str
   help: Components to include
