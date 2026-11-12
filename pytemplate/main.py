@@ -627,16 +627,24 @@ def skill_show() -> None:
 def skill_install(
     project: Annotated[
         bool,
-        typer.Option("--project", help="Install into ./.claude/skills instead of ~/.claude/skills"),
+        typer.Option("--project", help="Install into this directory instead of the home directory"),
     ] = False,
+    agent: Annotated[
+        str,
+        typer.Option(
+            "--agent",
+            help="'claude' for .claude/skills (Claude Code), or 'agents' for .agents/skills "
+            "(Codex and other Agent Skills clients)",
+        ),
+    ] = "claude",
     dest: Annotated[
         Path | None, typer.Option("--dest", help="Install into this skills directory instead")
     ] = None,
     force: Annotated[bool, typer.Option("--force", help="Replace an existing skill")] = False,
 ) -> None:
-    """Install the skill so Claude Code can create projects with pytemplate."""
-    skills_dir = dest if dest is not None else default_skills_dir(project=project)
+    """Install the skill so an AI coding agent can create projects with pytemplate."""
     try:
+        skills_dir = dest if dest is not None else default_skills_dir(project=project, agent=agent)
         target = install_skill(skills_dir, force=force)
     except SkillInstallError as error:
         console.print(f"[red]Error:[/] {error}")

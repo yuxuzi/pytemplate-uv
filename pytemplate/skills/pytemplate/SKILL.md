@@ -1,6 +1,6 @@
 ---
 name: pytemplate
-description: Create a uv-native Python project (typed package with a CLI, or a layered FastAPI service with optional database, background jobs, API-key or OIDC auth, and Dockerfile) with pytemplate-uv. Use when the user asks to create, scaffold, start, bootstrap, or generate a new Python package, CLI, library, or FastAPI/REST API project.
+description: Create a uv-native Python project (typed package with a CLI and optional MCP server for AI agents, or a layered FastAPI service with optional database, background jobs, API-key or OIDC auth, and Dockerfile) with pytemplate-uv. Use when the user asks to create, scaffold, start, bootstrap, or generate a new Python package, CLI, library, MCP server, or FastAPI/REST API project.
 ---
 
 # Create Python projects with pytemplate-uv
@@ -41,17 +41,21 @@ Use the JSON output, not guesses:
   `plan`, and `validate`. Treat a refusal as a sign the pack changed; never drop the pin to get past it.
 
 Choose the profile from what the user wants to build:
-- `python`: a library or command-line tool.
+- `python`: a library, a command-line tool, or an MCP server.
 - `fastapi`: an HTTP API or web service.
 
 If the request fits neither, say so instead of forcing a profile.
+
+For `python`, add `mcp` when the user wants an MCP server or tools an AI agent can call. It adds
+a stdio server on the official `mcp` SDK, a `<project_name>-mcp` command, and a `.mcp.json`.
 
 For `fastapi`, map the user's needs to components and add only what they asked for:
 - persistence, SQL, PostgreSQL, migrations: `database`;
 - long-running or background work: `worker`;
 - service-to-service keys: `auth-api-key`; user login through an identity provider:
   `auth-oidc` (choose one; `auth` is added automatically);
-- a Docker image: `container` (also available for `python`).
+- a Docker image: `container` (also available for `python`);
+- `auth` is never selected by itself; it comes with `auth-api-key` or `auth-oidc`.
 
 ## 3. Collect inputs
 
@@ -123,7 +127,7 @@ name): `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy <pack
 `uv run pytest`, and component commands such as `uv run alembic upgrade head`. Report the real
 results. If something fails, show the output; do not hide or
 "fix" it by weakening checks. Finish by pointing the user to the generated `README.md` and
-`CLAUDE.md`, and suggest committing the initial project (`git add -A && git commit`).
+`AGENTS.md` (`CLAUDE.md` imports it), and suggest committing the initial project (`git add -A && git commit`).
 
 ## Rules
 
