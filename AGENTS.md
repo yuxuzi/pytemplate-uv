@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Instructions and context for AI coding agents working on **pytemplate-uv** itself. Generated
-projects carry their own `CLAUDE.md`. Claude Code reads this file through `CLAUDE.md`.
+projects carry their own `AGENTS.md`. Claude Code reads this file through `CLAUDE.md`.
 
 ## What this project is
 
@@ -52,7 +52,8 @@ template change, also run the smoke tests. Report the real results.
 - `pytemplate/schema.py`: published JSON Schemas; `tests/test_schema.py` keeps them in step.
 - `pytemplate/errors.py`: `RenderError`, `RequestError`, and `PackError`.
 - `pytemplate/configuration.py`: TOML render requests.
-- `pytemplate/agent_skill.py` and `pytemplate/skills/pytemplate/SKILL.md`: the bundled AI skill.
+- `pytemplate/agent_skill.py` and `pytemplate/skills/pytemplate/SKILL.md`: the bundled AI skill,
+  installed into `.claude/skills` or `.agents/skills`.
 - `pytemplate/templates/`:
   - `questions.yml`: shared settings and questions;
   - `copier.yml`: bundled entry point;
@@ -66,7 +67,6 @@ template change, also run the smoke tests. Report the real results.
   - `test_composition.py`: every distinct component set renders exactly its components' owned
     paths and dependencies;
   - `test_packs.py` (fixture pack in `conftest.py`);
-  - `test_updating.py` (local git fixture);
   - `test_generated_projects.py`: opt-in smoke tests of every component set.
 
 ## Invariants
@@ -84,11 +84,10 @@ template change, also run the smoke tests. Report the real results.
   its files in compatible profile trees, and a `components` choice in `questions.yml`, and never
   a CLI or renderer change.
 - **Green generated projects:** every profile must pass its `lifecycle_commands`. Those commands
-  are mirrored in each template's `CLAUDE.md.jinja` and CI workflow, and tests enforce the match.
-- **Updatable projects:**
-  - The repo-root `copier.yml` and `pytemplate/templates/copier.yml` must render identically
-    (tested).
-  - Add new questions instead of renaming or removing existing ones.
+  are mirrored in each template's `AGENTS.md.jinja` and CI workflow, and tests enforce the match.
+- **Stable requests and tags:**
+  - Add new questions instead of renaming or removing existing ones; request files pass answers
+    by name.
   - Release tags `vX.Y.Z` must contain exactly the templates shipped in that wheel; the release
     workflow checks the tag against the version.
   - Never rewrite or move published tags.
@@ -101,7 +100,7 @@ template change, also run the smoke tests. Report the real results.
 
 - Strict mypy, ruff (line length 100), and docstrings on public functions.
 - Keep the CLI thin and put logic in modules that can be tested without Typer.
-- Raise the module's error type (`RenderError`, `UpdateError`, `ConfigurationError`,
+- Raise the module's error type (`RenderError`, `ConfigurationError`,
   `SkillInstallError`) with an actionable message; the CLI prints it and exits with code 1.
 - Tests use `tmp_path` and never touch the network, except the opt-in smoke tests.
 - Bump a profile's or component's `version` when its generated output changes, and add a
