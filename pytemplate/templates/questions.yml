@@ -89,6 +89,7 @@ components:
     - cli
     - container
     - database
+    - mcp
     - worker
   default: []
 

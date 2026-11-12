@@ -36,6 +36,7 @@ ready-to-deploy project.
 | `auth-api-key` | API key authentication with scopes | For service-to-service auth |
 | `auth-oidc` | OpenID Connect (JWT) authentication | For user login via identity provider |
 | `container` | Dockerfile and `.dockerignore` | For containerized deployment |
+| `mcp` | An MCP server over stdio, with a typed tool, a test, and `.mcp.json` (`python` profile) | To give AI agents tools they can call |
 
 Mix components freely — the generator validates combinations and adds required dependencies.
 
@@ -46,7 +47,7 @@ Every project generated from the bundled templates passes:
 - ✅ Strict `mypy` (type safety)
 - ✅ `pytest` (tests included)
 
-This is verified across all 26 bundled component combinations on every commit. Projects from
+This is verified across all 28 bundled component combinations on every commit. Projects from
 your own template packs are not covered by these checks; test your pack the same way.
 
 ### Built for teams
@@ -66,7 +67,7 @@ your own template packs are not covered by these checks; test your pack the same
 **The solution:**
 - Start from reviewed patterns: layered architecture, health checks, structured logs, auth
   behind a principal and scopes
-- Every bundled component combination is generated and checked in CI (26 combinations, on
+- Every bundled component combination is generated and checked in CI (28 combinations, on
   Linux and Windows)
 - Script it: the same request always produces the same project
 
@@ -232,9 +233,27 @@ pytemplate create my-tool -p tool --template gh:org/my-pack --template-ref v1.2.
   ```
 - See [docs/compatibility.md](docs/compatibility.md) for the versioning rules.
 
+## Built for AI coding agents
+
+Every generated project carries an `AGENTS.md`: its commands, layout, conventions, and safety
+rules, for any agent that reads the [AGENTS.md](https://agents.md) format. `CLAUDE.md` is a
+one-line import of it, so Claude Code reads the same text.
+
+To build something an agent can call, add `mcp` to a `python` project:
+
+```bash
+pytemplate create pricing-tools --profile python --component mcp --no-input
+cd pricing-tools && uv sync && uv run pytest
+```
+
+You get a [Model Context Protocol](https://modelcontextprotocol.io) server on the official SDK,
+a `pricing-tools-mcp` command, a test that calls the tool through the server, and a `.mcp.json`
+that registers it for agents working in the repository. Rendering it calls no model and needs no
+API key.
+
 ## Create projects with Claude or other AI tools
 
-pytemplate-uv ships a Claude Code skill (`SKILL.md`) that teaches Claude to:
+pytemplate-uv ships an agent skill (`SKILL.md`) that teaches an agent to:
 - discover profiles and components;
 - write a render request and check it with `plan`;
 - **wait for your confirmation**;
@@ -243,6 +262,7 @@ pytemplate-uv ships a Claude Code skill (`SKILL.md`) that teaches Claude to:
 ```bash
 uvx pytemplate-uv skill install            # ~/.claude/skills/pytemplate/SKILL.md (all projects)
 uvx pytemplate-uv skill install --project  # ./.claude/skills/pytemplate/SKILL.md (this repo)
+uvx pytemplate-uv skill install --agent agents  # ~/.agents/skills, for Codex and other clients
 ```
 
 Then ask, for example, *"Create a FastAPI service called pricing-api with a database and OIDC
@@ -281,7 +301,7 @@ pytemplate schema request
 
 ```
 pricing-api/
-  CLAUDE.md  README.md  pyproject.toml  .env.example  .copier-answers.yml  .pytemplate.toml
+  AGENTS.md  CLAUDE.md  README.md  pyproject.toml  .env.example  .copier-answers.yml  .pytemplate.toml
   pricing_api/
     api/             routers/, schemas, dependencies, errors, middleware, health
     application/     use cases
@@ -301,7 +321,7 @@ pricing-api/
 ```bash
 uv sync
 uv run pytest                    # run unit tests
-PYTEMPLATE_SMOKE=1 uv run pytest # verify all 26 component combinations work
+PYTEMPLATE_SMOKE=1 uv run pytest # verify all 28 component combinations work
 uv run ruff check .
 uv run mypy
 ```
@@ -350,7 +370,7 @@ Yes, intentionally. We have opinions on:
 - Layered architecture (domain, application, infrastructure)
 - Type safety (strict mypy by default)
 
-Each generated project's `README.md` and `CLAUDE.md` describe its layout and conventions.
+Each generated project's `README.md` and `AGENTS.md` describe its layout and conventions.
 
 **Can I generate projects without a network connection?**
 Yes, with the bundled templates: rendering never touches the network or reads your environment,

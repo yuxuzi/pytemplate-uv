@@ -18,10 +18,26 @@ def skill_text() -> str:
     return resource.read_text(encoding="utf-8")
 
 
-def default_skills_dir(*, project: bool) -> Path:
-    """Return Claude Code's user-level or project-level skills directory."""
+# Where each kind of agent looks for skills, under the home or project directory.
+AGENT_SKILL_DIRS = {
+    "claude": Path(".claude") / "skills",
+    "agents": Path(".agents") / "skills",
+}
+
+
+def default_skills_dir(*, project: bool, agent: str = "claude") -> Path:
+    """Return the user-level or project-level skills directory that ``agent`` reads.
+
+    ``claude`` is Claude Code's directory; ``agents`` is the shared ``.agents/skills``
+    directory read by Codex and other Agent Skills clients.
+    """
+    try:
+        relative = AGENT_SKILL_DIRS[agent]
+    except KeyError:
+        choices = ", ".join(sorted(AGENT_SKILL_DIRS))
+        raise SkillInstallError(f"Unknown agent '{agent}'; choose one of: {choices}.") from None
     base = Path.cwd() if project else Path.home()
-    return base / ".claude" / "skills"
+    return base / relative
 
 
 def install_skill(skills_dir: Path, *, force: bool = False) -> Path:

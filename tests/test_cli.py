@@ -233,7 +233,7 @@ def test_create_project_executable_runs_create_directly(tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 0, result.output
-    assert (tmp_path / "market-data-api" / "CLAUDE.md").is_file()
+    assert (tmp_path / "market-data-api" / "AGENTS.md").is_file()
 
 
 def test_validate_reports_components_added_by_requirements(tmp_path: Path) -> None:

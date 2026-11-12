@@ -14,12 +14,18 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
+{%- if 'mcp' in components %}
+    "mcp>=2.0",
+{%- endif %}
     "rich>=13.7",
     "typer>=0.12",
 ]
 
 [project.scripts]
 {{ package_name }} = "{{ package_name }}.cli:main"
+{%- if 'mcp' in components %}
+{{ project_name }}-mcp = "{{ package_name }}.mcp_server:main"
+{%- endif %}
 
 [dependency-groups]
 dev = [

@@ -4,11 +4,13 @@ import json
 import re
 from pathlib import Path
 
+import pytest
 import yaml
 from typer.testing import CliRunner
 
 from pytemplate.agent_skill import skill_text
 from pytemplate.main import app
+from pytemplate.profiles import bundled_catalog
 
 runner = CliRunner()
 
@@ -39,6 +41,31 @@ def test_skill_install_writes_and_refuses_to_overwrite(tmp_path: Path) -> None:
     assert second.exit_code == 1
     assert "already exists" in second.output
     assert forced.exit_code == 0, forced.output
+
+
+def test_skill_install_targets_the_chosen_agent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    claude = runner.invoke(app, ["skill", "install", "--project"])
+    shared = runner.invoke(app, ["skill", "install", "--project", "--agent", "agents"])
+    unknown = runner.invoke(app, ["skill", "install", "--project", "--agent", "other"])
+
+    assert claude.exit_code == 0, claude.output
+    assert shared.exit_code == 0, shared.output
+    assert (tmp_path / ".claude" / "skills" / "pytemplate" / "SKILL.md").is_file()
+    assert (tmp_path / ".agents" / "skills" / "pytemplate" / "SKILL.md").is_file()
+    assert unknown.exit_code == 1
+    assert "choose one of: agents, claude" in unknown.output
+
+
+def test_skill_mentions_every_optional_component() -> None:
+    text = skill_text()
+
+    for profile in bundled_catalog().profiles:
+        for identifier in profile.optional_components:
+            assert f"`{identifier}`" in text, identifier
 
 
 def test_skill_only_references_existing_cli_commands() -> None:
@@ -83,6 +110,7 @@ def test_list_json_outputs_parse() -> None:
         "cli",
         "container",
         "database",
+        "mcp",
         "worker",
     }
     assert component["compatible_profiles"] == ["fastapi"]

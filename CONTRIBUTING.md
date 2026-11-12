@@ -50,7 +50,7 @@ PYTEMPLATE_SMOKE=1 PYTEMPLATE_SMOKE_PROFILE=fastapi uv run pytest tests/test_gen
    owned paths, dependencies, or settings drift from the manifest.
 
 No change to `main.py`, `rendering.py`, or unrelated profiles is needed.
-- Keep the profile's `CLAUDE.md.jinja`, `README.md.jinja`, CI workflow, and `lifecycle_commands`
+- Keep the profile's `AGENTS.md.jinja`, `README.md.jinja`, CI workflow, and `lifecycle_commands`
   consistent; tests check that the commands match.
 - Never add Copier `_tasks` or `_migrations`, network access at render time, or real secrets.
 - Questions live in `pytemplate/templates/questions.yml` and are shared by all profiles. Add new

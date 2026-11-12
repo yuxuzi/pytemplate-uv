@@ -55,6 +55,7 @@ _RESERVED_PACKAGES = frozenset(
         "fastapi",
         "httpx",
         "jwt",
+        "mcp",
         "pydantic",
         "pydantic_settings",
         "pytest",

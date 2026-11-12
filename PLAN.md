@@ -1,371 +1,132 @@
-# PLAN.md — Phase 3.1–3.3: pytemplate-uv 3.0
+# PLAN.md — pytemplate-uv 3.1: agent-ready projects
 
-This is the working plan for the **3.0.0** PyPI release. It turns the generator into a
-deterministic application factory built from three parts:
-- profiles, which own an application's shape;
-- composable components, which add narrow capabilities;
-- explicitly selected external template packs.
-
-The Phase 2 record (Copier migration, green generated projects, `copier update`) is in the git
-history and the 2.x CHANGELOG entries.
+This is the working plan for the next release. It adds what comparable generators offer for AI
+coding agents, where that fits a deterministic, safe factory. The 3.0 plan (factory contract,
+FastAPI foundation, authentication) is finished; its record is in the git history and the 3.0.0
+CHANGELOG entry.
 
 Status key: `[x]` done and verified, `[ ]` open.
 
-## 1. Context
+## 1. Comparison (2026-11-11)
 
-What already works:
-- `list-*` and `describe-*` with `--json`;
-- `validate` and `create-from-config`;
-- a SHA-256 manifest inventory and `copier update`.
+Read from each project's PyPI metadata or repository README on that date. "No" means the page
+does not show it.
 
-Three gaps remain:
-1. **Components are decorative.** `profiles.resolve_components()` requires the selection to equal
-   `default_components`, and every manifest's `template_fragments` names the whole template.
-   Selecting components changes nothing. This is open critique item 5 from Phase 2.
-2. **The FastAPI profile is not a foundation.** It always ships SQLModel and a database. It has
-   no readiness endpoint, structured logging, layering, or authentication.
-3. **Callers cannot extend the factory without forking it.** Other projects need their own
-   profiles (for example, domain-specific tool packages), but the bundled templates are the only
-   source.
+| Project | Kind | Agent guidance in generated projects | Agent tooling | Other notable features |
+| --- | --- | --- | --- | --- |
+| pytemplate-uv 3.0 | PyPI CLI, Copier | `CLAUDE.md` only | Claude Code skill; `--json` on every command | Components with resolution, template packs with pins, 26 combinations checked in CI |
+| [pjkm](https://pypi.org/project/pjkm/) 0.1.1 | PyPI CLI | No | The generator is an MCP server | 105 groups, 22 recipes, a LangGraph agent recipe |
+| [dev-ready](https://pypi.org/project/dev-ready/) 0.13.0 | PyPI CLI | `AGENTS.md`, skills in `.agents/skills/`, links for each agent | Its own skill; MCP config | One FastAPI and React base fetched from GitHub at render time |
+| [agent-scaffold-cli](https://pypi.org/project/agent-scaffold-cli/) 0.4 | PyPI CLI | No | Asks a model to write the project; needs an API key | Agent projects for several frameworks |
+| [agentic-devkit](https://pypi.org/project/agentic-devkit/) 0.1.16 | PyPI CLI | `AGENTS.md` as a router to layered documents | Adapters for Cursor, Claude, and Copilot | Overlay onto an existing repository |
+| [simple-modern-uv](https://github.com/jlevy/simple-modern-uv) | Copier template | `AGENTS.md`, and a `CLAUDE.md` that imports it | Skill in the Agent Skills format for several agents | 14-day dependency cooldown, SHA-pinned Actions |
+| [python-copier-template](https://github.com/mjun0812/python-copier-template) | Copier template | `AGENTS.md` and `CLAUDE.md` | `.claude/settings.json` permissions, a format hook, Codex hooks | Devcontainer with the agents installed |
+| [python-production-template](https://github.com/oedokumaci/python-production-template) | Copier template | `CLAUDE.md`, Cursor rules | Project skills: commit, release, review, docs | ty, taskipy, docs site |
+| [uv-forge](https://uv-forge.readthedocs.io/en/latest/overview.html) | Copier template | No | No | zizmor, Sigstore signing, SLSA provenance, 100% coverage |
+| [cookiecutter-uv](https://github.com/osprey-oss/cookiecutter-uv) | Cookiecutter template | No | No | Docs site, devcontainer, tox-uv, PyPI publishing |
+| [PyScaffold](https://pypi.org/project/pyscaffold/) 4.6 (2024) | PyPI CLI | No | No | Extensions; pip and tox based |
+
+What pytemplate-uv already does better: no other project here resolves components against
+manifests, checks every combination in CI, pins external templates to a digest, or renders
+without the network, a model, or code execution.
+
+What it lacks:
+
+1. **`AGENTS.md`.** Four competitors write the cross-agent file; pytemplate-uv writes guidance
+   only Claude Code reads by default.
+2. **A project that is itself an agent tool.** Competitors either ask a model to write one or
+   ship a framework recipe. None renders a tested MCP server deterministically.
+3. **A skill for agents other than Claude Code.** `skill install` only knows `.claude/skills`.
+4. **Agent harness settings**: permissions and hooks in generated projects.
+5. **An MCP server for the generator itself.**
+6. **Supply-chain hardening** of generated CI: SHA-pinned Actions and a dependency cooldown.
+7. **Devcontainer and a docs site.**
 
 ## 2. Decisions
 
-- **No dependency on any consumer.** pytemplate-uv is generic. It never imports, depends on, or
-  names a downstream framework. Downstream projects call it from outside, through
-  `uvx pytemplate-uv==3.0.*` with JSON in and out, or through the `pytemplate.api` Python API.
-  They ship their own profiles as a template pack.
-- **The contract is versioned separately from releases.** `contract = 1` covers the
-  profile/component/pack manifest format. A breaking change to the format raises the contract
-  number. Profile and component `version`s change whenever their generated output changes.
-- **Composition stays inside Copier.** Component files have plain names in the compatible
-  profile's tree. The renderer and `pytemplate update` pass the `paths` of unselected components
-  to Copier as `exclude`, so the manifests are the only record of which files a component owns.
-  A `components` multiselect question is stored in `.copier-answers.yml`, so updates keep the same
-  selection. A test checks the manifests against the rendered output, and there is no second
-  merge engine. Conditional file names were tried first, but they pushed template paths past
-  Windows' 260-character limit in CI.
-- **Packs are explicit, never discovered.** They are selected by path or git ref on each request,
-  with no entry points or scanning. They render under the same rules: `unsafe=False`, and no
-  `_tasks`, `_migrations`, or `_jinja_extensions`.
-- **Advanced features are opt-in.** The default FastAPI service needs no database, Docker, or
-  identity provider.
-- **Release number 3.0.0.** A major release, because it breaks compatibility with 2.x.
-  Breaking changes: FastAPI's default drops the database, the manifest moves to v2, and
-  component errors become stricter.
+- **3.1 takes gaps 1 to 3.** They are additive, need no new dependency in the generator, and
+  can be proven by the existing composition and smoke tests.
+- **`AGENTS.md` is the one source of guidance.** `CLAUDE.md` becomes a one-line import of it, so
+  the two never drift. This is part of both profiles, not a component: it adds no combination
+  to the test matrix.
+- **`mcp` is a component of the `python` profile.** It adds a stdio server on the official
+  `mcp` SDK (2.x, `MCPServer`), one read-only tool over `core`, a `<package>-mcp` script, a
+  `.mcp.json` that registers the server for agents working in the project, and a test that
+  calls the tool through the server. The `python` profile goes from 2 to 4 combinations (28 in
+  total).
+- **No model calls, ever.** The generator stays deterministic and offline. That rules out the
+  agent-scaffold approach, and it rules out a bundled "LLM application" profile that would have
+  to choose a provider SDK; such a profile belongs in a template pack.
+- **Gap 4 waits.** A permissions file pre-approves commands on the user's behalf, and a hook runs
+  code. Both need a decision on safe defaults and a check against each agent's current
+  settings format before they ship.
+- **Gap 5 waits.** It adds the `mcp` SDK as a generator dependency (an extra at most). The CLI's
+  `--json` output and the skill already cover the same ground.
+- **Gaps 6 and 7 are not agent features.** They are listed in section 5 for a later release.
 
-## 3. Phase 3.1: the factory contract
+## 3. Steps
 
-### Manifests
+### Agent guidance
 
-`profile.toml`:
+- [x] 1. Both profiles render `AGENTS.md` (the former `CLAUDE.md` content) and a `CLAUDE.md`
+       that imports it. Profile versions go to `4`.
+- [x] 2. Tests: lifecycle commands appear in `AGENTS.md` and the CI workflow; `CLAUDE.md`
+       imports `AGENTS.md`.
 
-| Key | Meaning |
-| --- | --- |
-| `contract` | Manifest format version (`1`) |
-| `id`, `name`, `description`, `version`, `aliases` | As today |
-| `kind` | `library`, `cli`, or `service` |
-| `status` | `stable` or `experimental` |
-| `supported_python` | CPython minors, 3.11–3.15 |
-| `default_components`, `optional_components` | What is always included and what may be added |
-| `dependencies`, `dependency_groups` | The profile's own runtime requirements and PEP 735 groups (for example `dev`) |
-| `questions` | The subset of `questions.yml` this profile asks |
-| `lifecycle_commands`, `security_posture` | As today |
+### MCP server component
 
-`components/<id>.toml`:
+- [x] 3. `components/mcp.toml` and its files in the `python` tree; the `mcp` choice in
+       `questions.yml`; `mcp` added to the reserved package names.
+- [x] 4. Generated `pyproject.toml`, `README.md`, and `AGENTS.md` describe the server when it is
+       selected.
+- [x] 5. Smoke tests for all four `python` combinations.
 
-| Key | Meaning |
-| --- | --- |
-| `contract`, `id`, `name`, `description`, `version`, `status` | Identity; `status` is `stable`, `experimental`, or `planned` |
-| `compatible_profiles`, `requires`, `conflicts` | Resolution constraints |
-| `dependencies` | Runtime requirements added to `[project] dependencies` |
-| `dependency_groups` | Table `{group = ["spec", ...]}` added to `[dependency-groups]`; both can be inspected without rendering |
-| `paths` | Globs of files the component owns in the rendered project |
-| `settings` | Env vars: name, type, `required_in_production`, `secret` |
-| `lifecycle_commands`, `security_notes` | Commands and notes the component adds |
+### Skill
 
-Unknown keys, wrong types, duplicate list entries, and an unsupported `contract` fail at load
-time, and the error names the file. `check_catalog()` also checks the references between
-manifests:
-- every name in `compatible_profiles`, `requires`, `requires_any`, and `conflicts` exists;
-- profiles and components list each other in both directions;
-- no default component is `planned`.
-
-A `planned` component shows up in `list-components` and `describe-component`, but selecting it
-fails with an actionable error. Every bundled component is `stable` in 3.0; `planned` is kept for
-packs and future components.
-
-### Resolution
-
-`pytemplate/resolution.py`: `resolve(profile, requested, catalog=None)` works as follows:
-- the selection is the profile defaults plus the requested components (defaults are always
-  included);
-- `requires` is expanded transitively;
-- each component is checked against the profile's component lists and for `planned` status;
-- `conflicts` are checked from either side.
-
-The result depends only on the set of requested components, never their order. `catalog`
-defaults to the bundled components; template packs pass their own.
-
-Errors name the component, the reason, and the fix, for example:
-- ``Component 'store' (required by 'cache') is not available for profile 'demo'. Components for
-  'demo': base, metrics.``
-- ``Components 'metrics' and 'queue' cannot be combined; select at most one of them.``
-
-The result is a `Resolution`:
-- components, ordered by identifier;
-- `requested`, the caller's explicit choices, and `added`, the components pulled in by
-  `requires`. Both are kept so update tooling can explain why each component is present;
-- merged and deduplicated `dependencies` and `dependency_groups`;
-- owned paths;
-- settings: two components declaring the same setting differently is a `ManifestError`;
-- lifecycle commands and security notes.
-
-### Commands and interfaces
-
-- `pytemplate plan [flags | --config FILE] [--json]` prints the resolution and the exact file list
-  without writing anything. It renders into a temporary directory and discards it.
-- `--json` on `validate` and `create`, with stable exit codes: `0` ok, `1` invalid request,
-  `2` render failure.
-- `pytemplate schema {profile,component,pack,request,manifest}` emits a JSON Schema, so callers
-  can validate requests without importing this package.
-- `--template DIR|gh:org/repo` with `--template-ref TAG` (and `template` / `template_ref` in a
-  request TOML) selects an external pack.
-- `pytemplate.api` exposes `plan`, `validate`, `render`, and `load_request` as the documented
-  Python surface. Everything else is private.
-
-### Template packs
-
-A pack has the same layout as the bundled templates:
-
-```
-my-pack/
-  pytemplate-pack.toml   # contract = 1, id, version
-  questions.yml          # shared questions (may extend the bundled ones)
-  copier.yml             # _subdirectory: "{{ profile }}/template"
-  <profile>/profile.toml
-  <profile>/template/...
-  components/<id>.toml
-```
-
-The pack's source and ref are recorded in `.pytemplate.toml` and `.copier-answers.yml`, so
-`pytemplate update` works for pack-generated projects too.
-
-### Generation manifest v2 (`.pytemplate.toml`)
-
-It contains:
-- `schema = 2`;
-- the generator name and version;
-- the template source (bundled or pack, with its ref);
-- the profile id and version;
-- `[[components]]` with id and version;
-- `[answers]`, the sanitized render answers, never secrets or environment values;
-- `[[files]]` with `path`, `sha256`, and `owner` (a profile or component id).
-
-`update` keeps reading v1 manifests.
-
-### Compatibility policy (`docs/compatibility.md`)
-
-- **Contract number:** a breaking change to the manifest format is a major release.
-- **Versions:** profile and component `version`s are bumped when their output changes.
-- **Dependencies:** generated projects pin them through their own `uv.lock`.
-- **Deprecation:** a deprecated component or question stays for at least one minor release, with
-  a warning.
-- **Questions:** never renamed or removed, only added (a `copier update` constraint).
-
-### Acceptance criteria
-
-- Profiles, components, inputs, constraints, dependency groups, and the file list can all be
-  inspected without rendering into the target directory.
-- An invalid combination fails before rendering, with a specific, actionable error and exit code
-  `1`.
-- Each generated project records the generator, template source, profile and component versions,
-  and the selected options.
-- Adding a component edits only its manifest, its files in compatible profile trees, and the
-  question choices. It does not touch `main.py`, `rendering.py`, or unrelated profiles.
-  `tests/test_composition.py` enforces this.
-- A pack fixture renders through `--template`, is recorded in the manifest, and is rejected if it
-  declares `_tasks`, `_migrations`, or `_jinja_extensions`.
-- The generator, manifest, and contract tests pass on CPython 3.11–3.15 on Linux, Windows, and
-  macOS.
-
-## 4. Phase 3.2: FastAPI service foundation
-
-### Layout of the generated package
-
-```
-{{ package_name }}/
-  api/             # routers, request/response schemas, FastAPI dependencies
-  application/     # services / use cases
-  domain/          # models and ports (typing.Protocol)
-  infrastructure/  # adapters behind the ports
-  bootstrap/       # settings, logging, create_app()
-  cli.py           # `serve` (uvicorn, --reload for development)
-```
-
-Route handlers only receive dependencies. They never construct infrastructure clients.
-
-### Default (`api` component, no external infrastructure)
-
-- `/health/live` and `/health/ready`. Readiness runs the registered checks, and each component
-  contributes its own.
-- JSON structured logging with a correlation ID in a `contextvar`. An incoming `X-Request-ID` is
-  honoured, and the ID is echoed in the response.
-- One error envelope for application, validation, and unhandled errors.
-- Environment-prefixed settings, with production validation.
-- An example use case backed by an in-memory repository behind a domain port.
-- `uv run <package> serve --reload` as the local development command.
-
-### Optional components
-
-| Component | Adds |
-| --- | --- |
-| `database` | SQLAlchemy 2.x typed ORM (SQLModel removed), Alembic with an initial migration, a repository and unit of work behind the domain port, async SQLite by default, a `postgres` dependency group (`asyncpg`), and a database readiness check |
-| `worker` | A `TaskQueue` port, an in-process `BackgroundTaskQueue` adapter, and a job-status endpoint. No queue backend is chosen. |
-| `container` | `Dockerfile` and `.dockerignore`, moved out of the default |
-
-For `database`:
-- `DATABASE_URL` comes only from settings.
-- Migrations are a documented command (`uv run alembic upgrade head`) and never run on startup or
-  render.
-- Test fixtures apply migrations to a per-test temporary SQLite database.
-
-### Acceptance criteria
-
-- The default service starts locally, passes its tests, and serves both health endpoints with no
-  external infrastructure.
-- With `database`:
-  - migrations are repeatable (`upgrade head` twice is a no-op);
-  - test databases are isolated;
-  - no database URL is hard-coded in application code.
-- The domain, application, and infrastructure layers have separate unit tests, and one
-  integration test goes through the real ASGI request path.
-- Generated-service tests pass in Linux and Windows CI for every stable component combination.
-
-## 5. Phase 3.3: authentication and security
-
-### Components: `auth` plus exactly one mode
-
-The design changed during implementation. The mode is a component, not an `auth_mode` question,
-so each mode's dependencies live in its own manifest. A new generic contract key, `requires_any`,
-makes `auth` need at least one mode, and the two modes conflict with each other.
-
-| Component | Behaviour |
-| --- | --- |
-| `auth` | The principal and scopes, audit, and the rate-limit seam. `requires = ["api"]`, `requires_any = ["auth-api-key", "auth-oidc"]`. Selecting it alone fails with "add --component auth-api-key". |
-| `auth-api-key` | Keys come from the environment as SHA-256 hashes and are compared with `hmac.compare_digest` against every entry. A `hash-api-key` CLI command prints the entry to configure. For service-to-service use. |
-| `auth-oidc` | JWT validation against a configured JWKS URL, with issuer, audience, expiry, and `sub` checks. Only asymmetric algorithms are allowed (HMAC and `none` are refused in settings). Keys are fetched lazily, off the event loop. Uses `pyjwt[crypto]` in the generated project only. |
-
-Selecting either mode adds `auth` automatically. Leaving out every auth component means no
-authentication, for local or internal prototypes.
-
-### Shared pieces
-
-- A `Principal` (subject plus scopes) and a `require_scopes(...)` dependency. Routes never parse
-  tokens or call provider SDKs.
-- An `AuditSink` port with a structured-logging adapter.
-- A rate-limit dependency seam, a no-op by default.
-- A log redaction filter for `Authorization`, API keys, and every setting marked `secret`.
-- Production validation refuses:
-  - placeholder or empty secrets;
-  - wildcard or localhost hosts and CORS;
-  - `DEBUG`.
-- A generated `SECURITY.md` covering:
-  - the threat-model assumptions;
-  - the deployment responsibilities;
-  - the explicit deferral of password and account management.
-
-### Acceptance criteria
-
-- A project can leave out auth, or enable exactly one mode, through the component contract.
-- Positive and negative integration tests cover each mode: missing, malformed, expired,
-  wrong-issuer and wrong-audience credentials, and insufficient scope.
-- Tests use synthetic credentials (locally generated RSA keys for OIDC) and never contact an
-  identity provider.
-- Production settings with placeholder secrets or permissive CORS fail at startup.
-
-## 6. Steps
-
-### Contract (3.1)
-
-- [x] 1. Contract-1 dataclasses and strict loaders in `profiles.py`, with a reusable `Catalog`
-       and `load_catalog()`; slug ids; manifests for every component.
-- [x] 2. `resolve()` and `Resolution` in `resolution.py`: `requires`, `requires_any`, and
-       `conflicts`; merged dependencies; path ownership through `owner()`.
-- [x] 3. A `components` multiselect question, stored in the answers file; files of unselected
-       components excluded through their manifest `paths`; `tests/test_composition.py` over
-       every distinct component set.
-- [x] 4. Manifest schema 2 (template source, component reasons, answers, file owners). `update`
-       reads v1 manifests and maps legacy components through the profile's
-       `legacy_components`.
-- [x] 5. `plan`; `--json` and exit codes 0, 1, and 2 everywhere; `validate` with options and
-       template answer checks; `schema` (`pytemplate/schema.py`); `pytemplate/api.py`.
-- [x] 6. Template packs (`pytemplate/packs.py`):
-       - `--template`, `--template-ref`, and `template` / `template_ref` in request files;
-       - shallow git clones with `.git` removed;
-       - rejection of symlinks and code-running settings;
-       - `tests/test_packs.py`.
-- [x] 7. `docs/compatibility.md`.
-
-### FastAPI foundation (3.2)
-
-- [x] 8. The FastAPI template in layers:
-       - health and readiness;
-       - pure-ASGI request-context middleware with request IDs and a 500 envelope;
-       - JSON logs with redaction;
-       - the error envelope;
-       - settings with production checks;
-       - a `Container`;
-       - `serve`.
-       Health probes skip the host check, so container healthchecks work with production
-       `ALLOWED_HOSTS`.
-- [x] 9. `database`: SQLAlchemy 2.x, Alembic (URL from settings), a repository and unit of work,
-       per-test migrated SQLite, `alembic check`, and a `postgres` group.
-- [x] 10. `worker` (task-queue port, in-process adapter, job endpoints) and `container` (both
-        profiles).
-
-### Authentication (3.3)
-
-- [x] 11. `auth`, `auth-api-key`, and `auth-oidc`: principal and scopes, audit, redaction, a
-        rate-limit seam, `SECURITY.md`, and positive and negative tests per mode.
+- [x] 6. `skill install --agent agents` writes to `.agents/skills`, the directory Codex and
+       other Agent Skills clients read. `claude` stays the default.
+- [x] 7. `SKILL.md` maps "MCP server" and "tools for an AI agent" to the `mcp` component and
+       points to `AGENTS.md`.
 
 ### Release
 
-- [x] 12. Smoke tests run every distinct component set (26), with a 41-character project name.
-- [x] 13. README, `AGENTS.md`, `SKILL.md`, and the CHANGELOG (3.0.0, which includes the unreleased
-        2.1 work).
-- [x] 14. CI: the smoke matrix split by profile (Linux and Windows × 3.11 and 3.15), and a wheel
-        job that inspects, plans, and creates every profile and component.
-- [x] 15. Version bumped to 3.0.0 and `uv.lock` refreshed.
-- [ ] 16. Maintainer only:
-        - push the branch and confirm CI is green on all runners;
-        - set up the PyPI trusted publisher and the `pypi` environment;
-        - run a TestPyPI dry run;
-        - tag `v3.0.0`.
+- [x] 8. README, `AGENTS.md`, and the CHANGELOG.
+- [x] 9. Version 3.1.0 and `uv.lock`. The release also carries the removal of
+       `pytemplate update` (PR #9); [docs/compatibility.md](docs/compatibility.md) rule 3 records
+       it as an exception to the deprecation rule.
+- [ ] 10. Maintainer only: confirm CI is green on all runners, then tag `v3.1.0`.
 
-## 7. Verification (2026-10-28, macOS, CPython 3.11 generator, 3.14 generated projects)
+## 4. Acceptance criteria
+
+- Every generated project has an `AGENTS.md` naming its lifecycle commands, and a `CLAUDE.md`
+  that imports it.
+- `pytemplate create NAME -p python -c mcp` renders a project whose lint, format, strict
+  type-check, and tests pass, and whose test calls the tool through the server.
+- Without `mcp`, no MCP file or dependency is rendered.
+- `skill install --agent agents --project` writes `./.agents/skills/pytemplate/SKILL.md`.
+- The generator has no new dependency.
+
+## 5. Later candidates
+
+| Candidate | Needs first |
+| --- | --- |
+| `mcp` for the `fastapi` profile (streamable HTTP mounted on the service, behind the auth components) | A decision on how tool calls map to scopes |
+| Agent settings component: a deny rule for secret files, pre-approved lifecycle commands, a format hook | Safe defaults; a test against each agent's settings format |
+| Project skills in generated projects (release, review) | Evidence they help; a rule against scripts in skills |
+| `pytemplate mcp`: the generator as an MCP server | Approval of an optional `mcp` dependency |
+| SHA-pinned Actions and a dependency cooldown in generated CI | A way to keep pins current without `update` |
+| Devcontainer component | Nothing; one more combination per profile |
+
+## 6. Verification (2026-11-11, macOS, CPython 3.11 generator)
 
 | Check | Command | Result |
 | --- | --- | --- |
-| Unit, contract, composition, and pack tests | `uv run pytest` | 299 passed, 26 skipped (smoke) |
-| Lint and format | `uv run ruff check .`, `uv run ruff format --check pytemplate tests` | clean |
-| Types | `uv run mypy` | strict, no issues in 13 files |
-| Generated combinations | `PYTEMPLATE_SMOKE=1 uv run pytest tests/test_generated_projects.py` | 26 passed: sync, ruff, format, strict mypy, pytest, and `alembic upgrade head` for every component set |
-| Generated tests are warning-free | `uv run pytest -W error` in the full API-key and OIDC projects | 54 and 60 passed, 94% coverage |
-| Plan writes nothing | `pytemplate plan --name svc -p fastapi -c auth-oidc --json` | 53 files listed, `added: [auth]`, target directory untouched |
-| Actionable errors | `pytemplate validate -p python -c auth` and `-p fastapi -c auth` | both exit 1 ("not available for profile 'python'"; "add --component auth-api-key") |
-| Service runs | `uv run <package> serve`, then curl | `/health/live` 200; `/health/ready` 200 with `database: ok`; 401 envelope without a key; 400 envelope for an untrusted host; JSON logs |
-| Migrations repeatable | generated `test_migrations_are_repeatable_and_match_the_models` | upgrade twice, `check`, downgrade, upgrade: pass |
-| Pack rendering | `tests/test_packs.py` | directory and git-tag packs render and are recorded; `_tasks`, `_migrations`, `_jinja_extensions`, and symlinks are rejected |
-| No consumer coupling | `uv tree --no-dev --depth 1`; grep for QuantAgentOS | copier, rich, and typer only; no mention in code or docs |
-| Distribution | `uv build`, `uvx twine check --strict dist/*`, and the CI wheel script run locally | PASSED; four wheel-generated projects with the expected files |
+| Unit, contract, composition, and pack tests | `uv run pytest` | 326 passed, 28 skipped (smoke) |
+| Lint, format, and types | `uv run ruff check .`, `uv run ruff format --check pytemplate tests`, `uv run mypy` | clean |
+| Generated combinations | `PYTEMPLATE_SMOKE=1 uv run pytest tests/test_generated_projects.py`, by profile | 28 passed: 4 `python`, 24 `fastapi` |
+| `python` combinations on the newest target | the same, with `PYTEMPLATE_SMOKE_PYTHON=3.15` | 4 passed |
+| The generated server answers a client | `initialize` and `tools/call greet` piped to `uv run demo-tool-mcp` | returned `Greetings, esteemed Ada.` as text and structured content |
+| Distribution | `uv build`, `uvx twine check --strict dist/*` | PASSED |
 
-Follow-up (PR #5, 2026-10-29):
-- the Sourcery review findings on `update` are fixed, each with a regression test;
-- CPython 3.15 is supported: the generator suite passes on 3.15.2 (307 passed), and all 26
-  combinations pass with `python_version=3.15` on 3.15.2 and with the 3.11 default.
-
-Not verified locally:
-- the Windows and Linux CI runners;
-- Docker image builds;
-- PostgreSQL (asyncpg) at runtime;
-- a TestPyPI or PyPI upload.
+Not verified locally: the Windows and Linux CI runners, and `fastapi` combinations with
+`python_version=3.15`.

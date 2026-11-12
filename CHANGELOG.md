@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## [3.1.0] — 2026-11-11
+
+3.1.0 makes generated projects ready for AI coding agents. It also removes `pytemplate update`
+without the deprecation period that [docs/compatibility.md](docs/compatibility.md) asks for;
+that page records the exception.
+
 ### Removed
 
 - **Breaking:** `pytemplate update`, the `update` API, `--template-source`, and the request-file
@@ -16,6 +22,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- An `mcp` component for the `python` profile: a Model Context Protocol server over stdio on the
+  official `mcp` SDK (2.x), with one read-only tool, a `<project_name>-mcp` command, a test that
+  calls the tool through the server, and a `.mcp.json` that registers it for agents working in
+  the project.
+- Generated projects carry an `AGENTS.md`, the file most coding agents read. It holds what
+  `CLAUDE.md` held.
+- `skill install --agent agents` installs the skill into `.agents/skills`, which Codex and other
+  Agent Skills clients read. `claude` remains the default.
 - `--template-commit` and `--template-digest` (`template_commit` and `template_digest` in request
   files) refuse a git template pack whose tag moved or whose files changed, before any of it is
   read.
@@ -24,6 +38,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Generated `CLAUDE.md` is now one line that imports `AGENTS.md`. The `python` and `fastapi`
+  profiles are version 4.
+- `mcp` is a reserved package name, like the other generated dependencies.
 - Git template packs are cloned without line-ending conversion, so a pack has the same bytes on
   every machine.
 
@@ -92,6 +109,9 @@ deprecation rules that now apply.
 
 ### Changed
 
+- Generated `CLAUDE.md` is now one line that imports `AGENTS.md`. The `python` and `fastapi`
+  profiles are version 4.
+- `mcp` is a reserved package name, like the other generated dependencies.
 - The bundled skill discovers components and previews requests with `plan --json`.
 - CPython 3.15 is supported for the generator and for generated projects:
   - `python_version` accepts `3.15`;
@@ -119,6 +139,9 @@ deprecation rules that now apply.
 
 #### Changed
 
+- Generated `CLAUDE.md` is now one line that imports `AGENTS.md`. The `python` and `fastapi`
+  profiles are version 4.
+- `mcp` is a reserved package name, like the other generated dependencies.
 - Rendering uses Copier instead of Cookiecutter. Templates live in
   `pytemplate/templates/<profile>/` with a `copier.yml`; only `*.jinja` files are rendered.
 - Generated projects depend only on `uv` and `uvx`: `uv_build` backend, PEP 735

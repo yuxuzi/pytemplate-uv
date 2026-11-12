@@ -1,6 +1,7 @@
 """Tests for Copier-backed rendering, determinism, and generated agent guidance."""
 
 import hashlib
+import json
 import re
 import subprocess
 import tomllib
@@ -76,9 +77,11 @@ def test_rendered_files_have_no_template_leftovers(profile: str, tmp_path: Path)
 
 
 @pytest.mark.parametrize("profile", PROFILES)
-def test_generated_claude_md_is_profile_aware(profile: str, tmp_path: Path) -> None:
+def test_generated_agent_guidance_is_profile_aware(profile: str, tmp_path: Path) -> None:
     project = _render(profile, tmp_path)
-    guidance = (project / "CLAUDE.md").read_text(encoding="utf-8")
+    guidance = (project / "AGENTS.md").read_text(encoding="utf-8")
+
+    assert (project / "CLAUDE.md").read_text(encoding="utf-8") == "@AGENTS.md\n"
 
     assert "`market_data_api`" in guidance
     workflow = (project / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
@@ -153,6 +156,28 @@ def test_generated_projects_depend_only_on_uv(profile: str, tmp_path: Path) -> N
     pyproject = tree["pyproject.toml"].decode("utf-8")
     assert "[dependency-groups]" in pyproject
     assert "[project.optional-dependencies]" not in pyproject
+
+
+def test_mcp_component_registers_a_server_for_agents(tmp_path: Path) -> None:
+    project = _render("python", tmp_path, components=("mcp",))
+    pyproject = tomllib.loads((project / "pyproject.toml").read_text(encoding="utf-8"))
+    registration = json.loads((project / ".mcp.json").read_text(encoding="utf-8"))
+    guidance = (project / "AGENTS.md").read_text(encoding="utf-8")
+
+    script = "market-data-api-mcp"
+    assert pyproject["project"]["scripts"][script] == "market_data_api.mcp_server:main"
+    assert registration == {
+        "mcpServers": {"market-data-api": {"command": "uv", "args": ["run", script]}}
+    }
+    assert f"`uv run {script}`" in guidance
+    assert "mcp_server.py" in (project / "README.md").read_text(encoding="utf-8")
+
+
+def test_projects_without_the_mcp_component_do_not_mention_it(tmp_path: Path) -> None:
+    project = _render("python", tmp_path)
+
+    for name in ("pyproject.toml", "README.md", "AGENTS.md"):
+        assert "mcp" not in (project / name).read_text(encoding="utf-8").lower(), name
 
 
 def test_manifest_records_a_hash_for_every_rendered_file(tmp_path: Path) -> None:

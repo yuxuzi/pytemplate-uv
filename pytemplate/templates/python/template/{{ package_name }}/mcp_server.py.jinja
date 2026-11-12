@@ -1,0 +1,26 @@
+"""Model Context Protocol server: exposes the core logic to AI agents as typed tools."""
+
+from mcp.server.mcpserver import MCPServer
+from mcp.types import ToolAnnotations
+
+from {{ package_name }} import core
+
+server = MCPServer(
+    "{{ project_name }}",
+    instructions="Tools return computed values and change nothing.",
+)
+
+
+@server.tool(annotations=ToolAnnotations(read_only_hint=True))
+def greet(name: str, formal: bool = False) -> str:
+    """Return a greeting for ``name``; ``formal`` selects the formal wording."""
+    return core.greet(name, formal=formal)
+
+
+def main() -> None:
+    """Serve over stdio; stdout carries the protocol, so never print to it."""
+    server.run()
+
+
+if __name__ == "__main__":
+    main()

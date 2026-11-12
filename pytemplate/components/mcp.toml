@@ -1,0 +1,13 @@
+contract = 1
+id = "mcp"
+name = "MCP server"
+description = "A Model Context Protocol server over stdio that exposes the package's functions to AI agents as typed tools."
+version = "1"
+status = "stable"
+compatible_profiles = ["python"]
+dependencies = ["mcp>=2.0"]
+paths = ["{package}/mcp_server.py", "tests/test_mcp_server.py", ".mcp.json"]
+security_notes = [
+    "The server speaks stdio only and opens no network port.",
+    "Tool arguments come from a model: validate them, and keep tools read-only unless the caller is asked first.",
+]
