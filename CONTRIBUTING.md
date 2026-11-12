@@ -54,10 +54,8 @@ No change to `main.py`, `rendering.py`, or unrelated profiles is needed.
   consistent; tests check that the commands match.
 - Never add Copier `_tasks` or `_migrations`, network access at render time, or real secrets.
 - Questions live in `pytemplate/templates/questions.yml` and are shared by all profiles. Add new
-  questions instead of renaming or removing existing ones, so `copier update` keeps working for
-  existing projects.
-- Keep the repo-root `copier.yml` and `pytemplate/templates/copier.yml` equivalent; a test renders
-  both and compares the output.
+  questions instead of renaming or removing existing ones, because request files pass answers by
+  name.
 - Name ignore files inside templates `.gitignore.jinja`; nothing under `pytemplate/templates/`
   may be git-ignored.
 - Bump the profile `version` in `profile.toml` when generated output changes.

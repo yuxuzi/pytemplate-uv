@@ -51,7 +51,6 @@ def test_skill_only_references_existing_cli_commands() -> None:
         "describe-component",
         "plan",
         "create-from-config",
-        "update",
     } <= commands
     for command in commands:
         result = runner.invoke(app, [command, "--help"])

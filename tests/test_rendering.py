@@ -2,14 +2,23 @@
 
 import hashlib
 import re
+import subprocess
 import tomllib
 from pathlib import Path
 
 import pytest
+import yaml
 
 import pytemplate.rendering as rendering
 from pytemplate.profiles import get_profile
-from pytemplate.rendering import RenderError, RenderRequest, RequestError, render
+from pytemplate.rendering import (
+    DEFAULT_TEMPLATE_SOURCE,
+    RenderError,
+    RenderRequest,
+    RequestError,
+    generator_version,
+    render,
+)
 
 PROFILES = ("python", "fastapi")
 SOURCE_ROOT = Path(__file__).parent.parent / "pytemplate"
@@ -216,3 +225,32 @@ def test_only_directories_emptied_by_exclusions_are_removed(tmp_path: Path) -> N
     assert not (tmp_path / "migrations").exists()
     assert (tmp_path / "user" / "empty").is_dir()
     assert (tmp_path / "pkg" / "kept" / "module.py").is_file()
+
+
+def test_answers_file_records_the_stable_template_source(tmp_path: Path) -> None:
+    result = render(
+        RenderRequest(profile_id="python", project_name="demo", output_dir=tmp_path, no_input=True)
+    )
+
+    answers = yaml.safe_load((result.project_path / ".copier-answers.yml").read_text("utf-8"))
+    assert answers["_src_path"] == DEFAULT_TEMPLATE_SOURCE
+    assert answers["_commit"] == f"v{generator_version()}"
+    assert answers["profile"] == "python"
+
+
+def test_no_template_file_is_ignored_by_git() -> None:
+    """A git-ignored template file would never be committed, so releases would lack it."""
+    files = [
+        str(path.relative_to(SOURCE_ROOT.parent))
+        for path in (SOURCE_ROOT / "templates").rglob("*")
+        if path.is_file() and "__pycache__" not in path.parts
+    ]
+    ignored = subprocess.run(
+        ["git", "check-ignore", "--no-index", *files],
+        cwd=SOURCE_ROOT.parent,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert ignored.stdout == ""

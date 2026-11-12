@@ -34,7 +34,6 @@ from pytemplate.rendering import RenderPlan, RenderRequest, RenderResult, plan, 
 from pytemplate.rendering import validate_request as validate
 from pytemplate.resolution import Resolution, resolve
 from pytemplate.schema import SCHEMAS
-from pytemplate.updating import UpdateError, UpdateRequest, UpdateResult, update
 
 __all__ = [
     "SCHEMAS",
@@ -55,15 +54,11 @@ __all__ = [
     "Resolution",
     "Setting",
     "TemplateSource",
-    "UpdateError",
-    "UpdateRequest",
-    "UpdateResult",
     "bundled_catalog",
     "load_request",
     "open_catalog",
     "plan",
     "render",
     "resolve",
-    "update",
     "validate",
 ]

@@ -30,8 +30,8 @@ format.
    - The item keeps working, with a warning, for at least one minor release, and the CHANGELOG
      names the replacement.
    - It is removed only in the next major release.
-4. **Questions are never renamed or removed**, because `copier update` replays the recorded
-   answers. Add a new question instead.
+4. **Questions are never renamed or removed**, because request files and scripts pass answers by
+   name. Add a new question instead.
 5. **Exit codes are stable.**
    - `0` means success.
    - `1` means an invalid request; nothing was written.
@@ -53,26 +53,14 @@ format.
 | `experimental` | Selectable, but output may change in a minor release; the CHANGELOG says how |
 | `planned` | Described for discovery only; selecting it fails with an actionable error |
 
-## Generated projects and updates
+## Generated projects
 
 - Each project records its sources in two files:
-  - `.copier-answers.yml` records the template source and tag, so `pytemplate update` can merge
-    newer templates with `copier update`;
+  - `.copier-answers.yml` records the Copier answers and the template source and tag;
   - `.pytemplate.toml` records the generator, template, profile, and component versions, the
     sanitized answers, and a hash and owner for every generated file.
-- `pytemplate update` is a dry run unless `--apply` is given, and it requires a clean git tree.
-  Conflicts are marked inline and never resolved silently.
-- `update` keeps a project's recorded components. It excludes the files of unselected
-  components exactly as `create` does, and does not add or remove components. To change them,
-  generate a new project and move your code over.
-- **Projects from 2.0** have no answers file and cannot be updated; regenerate them with 3.0.
-- **Projects from 2.1 development builds** never recorded their components.
-  - `pytemplate update` keeps everything such a project already had: the components in its
-    manifest, plus the profile's `legacy_components` (`container`, and `database` for
-    `fastapi`).
-  - It then records the components, so later updates behave like any 3.x project.
-- Plain `copier copy` from the git repository is not a supported entry point. pytemplate passes
-  the resolved `components` and validates the request first; use `pytemplate create` instead.
+- A generated project belongs to its owner. pytemplate-uv does not merge later template releases
+  into it.
 
 ## Template packs
 
@@ -82,11 +70,10 @@ format.
   - they render with `unsafe=False`;
   - they may not declare `_tasks`, `_migrations`, or `_jinja_extensions`;
   - they may not contain symlinks.
-- A pack versions itself: its git tags and its `pytemplate-pack.toml` `version`. Pack-generated
-  projects are updated with `pytemplate update --to <pack tag>`.
+- A pack versions itself: its git tags and its `pytemplate-pack.toml` `version`.
 - A git pack can be pinned with `--template-commit` and `--template-digest`, or `template_commit`
   and `template_digest` in a request file, alongside its ref. A pack that does not match is refused
-  with exit code 1, before any of it is read. `pytemplate update` does not check a pin.
+  with exit code 1, before any of it is read.
 - The digest format is stable. It is a SHA-256 over every file in the checkout, without `.git`, in
   order of their path components compared as case-sensitive strings. For each file, it hashes the
   path with forward slashes, a NUL byte, the file's bytes, and another NUL byte.

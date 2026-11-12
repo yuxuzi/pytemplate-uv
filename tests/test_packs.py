@@ -16,7 +16,6 @@ from pytemplate.errors import PackError, RenderError
 from pytemplate.main import app
 from pytemplate.packs import is_git_source, open_catalog, pack_digest
 from pytemplate.rendering import RenderRequest, plan, render
-from pytemplate.updating import _manifest_source
 
 runner = CliRunner()
 
@@ -427,21 +426,3 @@ def test_request_file_carries_the_pin(pack: Path, tmp_path: Path) -> None:
 
     assert request.template_commit == "a" * 40
     assert request.template_digest == "b" * 64
-
-
-def test_update_does_not_keep_the_previous_tags_commit_or_digest() -> None:
-    manifest = {
-        "template": {
-            "kind": "pack",
-            "source": "gh:org/pack",
-            "ref": "v1.0.0",
-            "commit": "a" * 40,
-            "digest": "b" * 64,
-        }
-    }
-
-    source = _manifest_source(manifest, {})
-
-    assert source.ref == "v1.0.0"
-    assert source.commit is None
-    assert source.digest is None

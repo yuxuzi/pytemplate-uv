@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Removed
+
+- **Breaking:** `pytemplate update`, the `update` API, `--template-source`, and the request-file
+  key `template_source` are gone, along with the repository-root `copier.yml` that `update`
+  fetched by tag. A generated project belongs to its owner from the first commit; to see what a
+  newer release changed, generate a fresh project with the same answers and compare. Generated
+  projects still record `.copier-answers.yml` and `.pytemplate.toml`.
+
 ### Added
 
 - `--template-commit` and `--template-digest` (`template_commit` and `template_digest` in request
