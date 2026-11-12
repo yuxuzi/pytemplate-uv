@@ -91,13 +91,10 @@ What it lacks:
 ### Release
 
 - [x] 8. README, `AGENTS.md`, and the CHANGELOG.
-- [ ] 9. Maintainer only: choose the version number (see the note below), bump it, confirm CI on
-       all runners, and tag.
-
-**Version note.** `main` already holds the removal of `pytemplate update` (PR #9).
-[docs/compatibility.md](docs/compatibility.md) rule 3 says removals happen only in a major
-release, after a deprecation. Releasing this as 3.1.0 needs either an exception recorded in the
-CHANGELOG or the number 4.0.0.
+- [x] 9. Version 3.1.0 and `uv.lock`. The release also carries the removal of
+       `pytemplate update` (PR #9); [docs/compatibility.md](docs/compatibility.md) rule 3 records
+       it as an exception to the deprecation rule.
+- [ ] 10. Maintainer only: confirm CI is green on all runners, then tag `v3.1.0`.
 
 ## 4. Acceptance criteria
 
@@ -119,3 +116,17 @@ CHANGELOG or the number 4.0.0.
 | `pytemplate mcp`: the generator as an MCP server | Approval of an optional `mcp` dependency |
 | SHA-pinned Actions and a dependency cooldown in generated CI | A way to keep pins current without `update` |
 | Devcontainer component | Nothing; one more combination per profile |
+
+## 6. Verification (2026-11-11, macOS, CPython 3.11 generator)
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Unit, contract, composition, and pack tests | `uv run pytest` | 326 passed, 28 skipped (smoke) |
+| Lint, format, and types | `uv run ruff check .`, `uv run ruff format --check pytemplate tests`, `uv run mypy` | clean |
+| Generated combinations | `PYTEMPLATE_SMOKE=1 uv run pytest tests/test_generated_projects.py`, by profile | 28 passed: 4 `python`, 24 `fastapi` |
+| `python` combinations on the newest target | the same, with `PYTEMPLATE_SMOKE_PYTHON=3.15` | 4 passed |
+| The generated server answers a client | `initialize` and `tools/call greet` piped to `uv run demo-tool-mcp` | returned `Greetings, esteemed Ada.` as text and structured content |
+| Distribution | `uv build`, `uvx twine check --strict dist/*` | PASSED |
+
+Not verified locally: the Windows and Linux CI runners, and `fastapi` combinations with
+`python_version=3.15`.

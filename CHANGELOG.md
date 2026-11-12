@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## [3.1.0] — 2026-11-11
+
+3.1.0 makes generated projects ready for AI coding agents. It also removes `pytemplate update`
+without the deprecation period that [docs/compatibility.md](docs/compatibility.md) asks for;
+that page records the exception.
+
 ### Removed
 
 - **Breaking:** `pytemplate update`, the `update` API, `--template-source`, and the request-file

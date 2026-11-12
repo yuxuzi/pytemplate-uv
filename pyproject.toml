@@ -1,6 +1,6 @@
 [project]
 name = "pytemplate-uv"
-version = "3.0.0"
+version = "3.1.0"
 description = "A deterministic application factory: uv-native Python and FastAPI projects from profiles, composable components, and template packs."
 readme = "README.md"
 requires-python = ">=3.11"

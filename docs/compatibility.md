@@ -30,6 +30,9 @@ format.
    - The item keeps working, with a warning, for at least one minor release, and the CHANGELOG
      names the replacement.
    - It is removed only in the next major release.
+   - One exception: 3.1.0 removed `pytemplate update`, the `update` API, `--template-source`, and
+     the request key `template_source` without a deprecation period. Merging a template release
+     into a project its owner has changed was not safe to keep offering.
 4. **Questions are never renamed or removed**, because request files and scripts pass answers by
    name. Add a new question instead.
 5. **Exit codes are stable.**
