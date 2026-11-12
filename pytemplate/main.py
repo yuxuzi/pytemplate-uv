@@ -32,7 +32,6 @@ from pytemplate.profiles import (
     ProfileNotFoundError,
 )
 from pytemplate.rendering import (
-    DEFAULT_TEMPLATE_SOURCE,
     RenderPlan,
     RenderRequest,
     generator_version,
@@ -42,7 +41,6 @@ from pytemplate.rendering import (
 )
 from pytemplate.resolution import Resolution
 from pytemplate.schema import SCHEMAS
-from pytemplate.updating import UpdateError, UpdateRequest, update
 
 app = typer.Typer(
     name="pytemplate",
@@ -116,14 +114,6 @@ DataOption = Annotated[
         "--data",
         "-d",
         help="Answer a template question as KEY=VALUE; repeat for multiple answers",
-    ),
-]
-TemplateSourceOption = Annotated[
-    str,
-    typer.Option(
-        "--template-source",
-        help="Git source recorded for `pytemplate update` of bundled profiles (for forks)",
-        show_default=True,
     ),
 ]
 ConfigArgument = Annotated[
@@ -231,7 +221,6 @@ def _request(
     template_ref: str | None,
     template_commit: str | None = None,
     template_digest: str | None = None,
-    template_source: str = DEFAULT_TEMPLATE_SOURCE,
     no_input: bool = True,
     overwrite: bool = False,
     dry_run: bool = False,
@@ -248,7 +237,6 @@ def _request(
         overwrite=overwrite,
         dry_run=dry_run,
         data=_parse_data(data),
-        template_source=template_source,
         template=template,
         template_ref=template_ref,
         template_commit=template_commit,
@@ -303,7 +291,6 @@ def create(
     template_ref: TemplateRefOption = None,
     template_commit: TemplateCommitOption = None,
     template_digest: TemplateDigestOption = None,
-    template_source: TemplateSourceOption = DEFAULT_TEMPLATE_SOURCE,
     as_json: JsonOption = False,
 ) -> None:
     """Create a project from a bundled profile or a template pack."""
@@ -319,7 +306,6 @@ def create(
             template_ref=template_ref,
             template_commit=template_commit,
             template_digest=template_digest,
-            template_source=template_source,
             no_input=no_input,
             overwrite=force,
             dry_run=dry_run,
@@ -629,38 +615,6 @@ def schema_command(
         console.print(f"[red]Error:[/] Unknown schema '{name}'. Available: {', '.join(SCHEMAS)}.")
         raise typer.Exit(code=EXIT_INVALID)
     _echo_json(SCHEMAS[name])
-
-
-@app.command("update")
-def update_command(
-    project_dir: Annotated[
-        Path, typer.Argument(help="Generated project directory (a clean git repository)")
-    ] = Path("."),
-    to: Annotated[
-        str | None,
-        typer.Option("--to", help="Template tag to update to; defaults to this version's tag"),
-    ] = None,
-    apply: Annotated[
-        bool, typer.Option("--apply", help="Write the changes; without it this is a dry run")
-    ] = False,
-) -> None:
-    """Merge a newer template version into a generated project with `copier update`."""
-    try:
-        result = update(UpdateRequest(project_dir=project_dir, to_ref=to, apply=apply))
-    except UpdateError as error:
-        console.print(f"[red]Error:[/] {error}")
-        raise typer.Exit(code=1) from error
-    source = result.from_ref or "an unrecorded version"
-    if not result.applied:
-        console.print(
-            f"[yellow]Dry run:[/] would update {result.project_path} from {source} to "
-            f"{result.to_ref}. Re-run with --apply to write the changes."
-        )
-        return
-    console.print(
-        f"[green]Updated[/] {result.project_path} from {source} to {result.to_ref}. "
-        "Review `git diff` and resolve any conflict markers before committing."
-    )
 
 
 @skill_app.command("show")

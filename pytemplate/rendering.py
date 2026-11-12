@@ -83,7 +83,6 @@ class RenderRequest:
     ``template`` selects an external template pack (a directory or git source) and
     ``template_ref`` a git tag or branch of it; leave both unset for the bundled templates.
     ``template_commit`` and ``template_digest`` refuse a git pack that no longer matches them.
-    ``template_source`` is the git source recorded for bundled projects (for forks).
     """
 
     profile_id: str
@@ -94,7 +93,6 @@ class RenderRequest:
     overwrite: bool = False
     dry_run: bool = False
     data: Mapping[str, str] = field(default_factory=dict)
-    template_source: str = DEFAULT_TEMPLATE_SOURCE
     template: str | None = None
     template_ref: str | None = None
     template_commit: str | None = None
@@ -264,16 +262,10 @@ def write_generation_manifest(
     project_path: Path,
     resolution: Resolution,
     source: TemplateSource,
-    files: Sequence[Path] | None = None,
 ) -> Path:
-    """Record the resolved factory contract and an owned-file hash inventory in a project.
-
-    ``files`` defaults to every file under ``project_path``, which is correct right after
-    rendering; callers updating an existing project pass the files they want inventoried.
-    """
+    """Record the resolved factory contract and an owned-file hash inventory in a project."""
     manifest_path = project_path / MANIFEST_FILE
-    if files is None:
-        files = [path for path in project_path.rglob("*") if path.is_file()]
+    files = [path for path in project_path.rglob("*") if path.is_file()]
     answers = _recorded_answers(project_path)
     package = str(answers.get("package_name", project_path.name.replace("-", "_")))
     profile = resolution.profile
@@ -330,7 +322,7 @@ def write_generation_manifest(
 
 
 def _record_template_source(project_path: Path, location: str, ref: str | None) -> None:
-    """Point the answers file at the template's git source so `copier update` can merge."""
+    """Record the template's stable source, not Copier's local path, so output is deterministic."""
     answers_path = project_path / ANSWERS_FILE
     answers = yaml.safe_load(answers_path.read_text(encoding="utf-8")) or {}
     answers["_src_path"] = location
@@ -435,7 +427,7 @@ def _source(request: RenderRequest, opened: TemplateSource) -> TemplateSource:
         return opened
     installed = generator_version()
     ref = None if installed == "uninstalled" else f"v{installed}"
-    return TemplateSource(kind=opened.kind, location=request.template_source, ref=ref)
+    return TemplateSource(kind=opened.kind, location=DEFAULT_TEMPLATE_SOURCE, ref=ref)
 
 
 def plan(request: RenderRequest) -> RenderPlan:

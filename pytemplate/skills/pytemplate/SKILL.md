@@ -1,6 +1,6 @@
 ---
 name: pytemplate
-description: Create or update a uv-native Python project (typed package with a CLI, or a layered FastAPI service with optional database, background jobs, API-key or OIDC auth, and Dockerfile) with pytemplate-uv. Use when the user asks to create, scaffold, start, bootstrap, or generate a new Python package, CLI, library, or FastAPI/REST API project, or to upgrade a project that pytemplate-uv generated.
+description: Create a uv-native Python project (typed package with a CLI, or a layered FastAPI service with optional database, background jobs, API-key or OIDC auth, and Dockerfile) with pytemplate-uv. Use when the user asks to create, scaffold, start, bootstrap, or generate a new Python package, CLI, library, or FastAPI/REST API project.
 ---
 
 # Create Python projects with pytemplate-uv
@@ -125,29 +125,10 @@ results. If something fails, show the output; do not hide or
 "fix" it by weakening checks. Finish by pointing the user to the generated `README.md` and
 `CLAUDE.md`, and suggest committing the initial project (`git add -A && git commit`).
 
-## Updating an existing generated project
-
-Projects created by pytemplate-uv 3.0+ contain `.copier-answers.yml` and can be upgraded with a
-three-way merge that keeps user edits.
-
-1. Make sure the project is a git repository with no uncommitted changes. Projects from a
-   template pack need `--to <pack tag>`.
-2. Preview the update (a dry run that writes nothing):
-   ```bash
-   uvx pytemplate-uv update path/to/project
-   ```
-3. With the user's approval, apply it:
-   ```bash
-   uvx pytemplate-uv update path/to/project --apply
-   ```
-   Add `--to vX.Y.Z` to target a specific template release.
-4. Review `git diff` with the user, resolve any `<<<<<<<` conflict markers, run the lifecycle
-   commands again, and let the user commit.
-
 ## Rules
 
 - Never edit `.copier-answers.yml` or `.pytemplate.toml` by hand.
-- Never run `--force` or `update --apply` without explicit user approval.
+- Never run `--force` without explicit user approval.
 - Never put credentials into `.env.example`, a request file, or any answer; generated services
   read secrets from the environment only.
 - Use pip, virtualenv activation, or make only if the user asks; generated projects use `uv` and

@@ -144,7 +144,6 @@ REQUEST = _document(
             "no_input": {"type": "boolean"},
             "overwrite": {"type": "boolean"},
             "data": {"type": "object", "additionalProperties": {"type": "string"}},
-            "template_source": _TEXT,
             "template": _TEXT,
             "template_ref": _TEXT,
             "template_commit": _TEXT,

@@ -6,7 +6,7 @@ import tomllib
 from pathlib import Path
 
 from pytemplate.packs import is_git_source
-from pytemplate.rendering import DEFAULT_TEMPLATE_SOURCE, RenderRequest
+from pytemplate.rendering import RenderRequest
 
 
 class ConfigurationError(ValueError):
@@ -21,7 +21,6 @@ _ALLOWED_KEYS = {
     "no_input",
     "overwrite",
     "data",
-    "template_source",
     "template",
     "template_ref",
     "template_commit",
@@ -34,13 +33,6 @@ def _template_data(table: object) -> dict[str, str]:
     if not isinstance(table, dict) or not all(isinstance(value, str) for value in table.values()):
         raise ConfigurationError("Configuration table 'data' must map question names to strings.")
     return dict(table)
-
-
-def _template_source(value: object) -> str:
-    """Validate the optional git source recorded for `copier update`."""
-    if not isinstance(value, str) or not value:
-        raise ConfigurationError("Configuration key 'template_source' must be a non-empty string.")
-    return value
 
 
 def _optional_string(data: dict[str, object], key: str) -> str | None:
@@ -107,7 +99,6 @@ def load_render_request(path: Path, *, dry_run: bool = False) -> RenderRequest:
         overwrite=overwrite,
         dry_run=dry_run,
         data=_template_data(data.get("data", {})),
-        template_source=_template_source(data.get("template_source", DEFAULT_TEMPLATE_SOURCE)),
         template=template,
         template_ref=_optional_string(data, "template_ref"),
         template_commit=_optional_string(data, "template_commit"),
