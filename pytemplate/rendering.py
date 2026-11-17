@@ -15,10 +15,7 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-
-import yaml
-from copier import Settings, run_copy
-from copier.errors import CopierError
+from typing import Any
 
 from pytemplate.errors import RenderError, RequestError
 from pytemplate.packs import TemplateSource, open_catalog
@@ -245,6 +242,8 @@ def _recorded_answers(project_path: Path) -> dict[str, object]:
     answers_path = project_path / ANSWERS_FILE
     if not answers_path.is_file():
         return {}
+    import yaml
+
     answers = yaml.safe_load(answers_path.read_text(encoding="utf-8")) or {}
     return {
         str(key): value
@@ -324,6 +323,8 @@ def write_generation_manifest(
 
 def _record_template_source(project_path: Path, location: str, ref: str | None) -> None:
     """Record the template's stable source, not Copier's local path, so output is deterministic."""
+    import yaml
+
     answers_path = project_path / ANSWERS_FILE
     answers = yaml.safe_load(answers_path.read_text(encoding="utf-8")) or {}
     answers["_src_path"] = location
@@ -384,6 +385,14 @@ def _publish(staged: Path, project_path: Path) -> None:
     _remove(backup)
 
 
+def run_copy(*args: Any, **kwargs: Any) -> Any:
+    """Run Copier with default settings; imported here because Copier is slow to import."""
+    from copier import Settings
+    from copier import run_copy as copier_run_copy
+
+    return copier_run_copy(*args, settings=Settings(), **kwargs)
+
+
 def _render_into(
     destination: Path,
     request: RenderRequest,
@@ -392,12 +401,13 @@ def _render_into(
     template_path: Path,
 ) -> Path:
     """Render with Copier into ``destination`` and write the answers and manifest files."""
+    from copier.errors import CopierError
+
     try:
         run_copy(
             str(template_path),
             destination,
             data=_context(request, resolution),
-            settings=Settings(),
             defaults=request.no_input,
             quiet=True,
             unsafe=False,

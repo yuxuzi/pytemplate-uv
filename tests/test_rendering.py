@@ -279,3 +279,12 @@ def test_no_template_file_is_ignored_by_git() -> None:
     )
 
     assert ignored.stdout == ""
+
+
+def test_importing_the_cli_does_not_import_copier() -> None:
+    """`--help` and the list commands must not pay for Copier's import."""
+    import subprocess
+    import sys
+
+    code = "import pytemplate.main, sys; assert 'copier' not in sys.modules"
+    subprocess.run([sys.executable, "-c", code], check=True)

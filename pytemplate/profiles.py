@@ -11,8 +11,6 @@ from importlib import resources
 from importlib.resources.abc import Traversable
 from typing import Any
 
-import yaml
-
 CONTRACT_VERSION = 1
 PROFILE_KINDS = ("library", "cli", "service")
 PROFILE_STATUSES = ("stable", "experimental")
@@ -258,6 +256,8 @@ def _question_specs(label: str, resource: Traversable) -> dict[str, dict[str, An
     """Return Copier questions in declaration order, excluding `_` settings."""
     if not resource.is_file():
         raise ManifestError(f"{label}: questions.yml is missing.")
+    import yaml
+
     try:
         data = yaml.safe_load(resource.read_text(encoding="utf-8"))
     except yaml.YAMLError as error:
