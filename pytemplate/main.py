@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import sys
 from collections.abc import Callable, Iterator
 from dataclasses import asdict
 from pathlib import Path
@@ -80,6 +81,11 @@ _REQUEST_ERRORS = (
 
 def _echo_json(payload: object) -> None:
     typer.echo(json.dumps(payload, indent=2))
+
+
+def _stdin_is_tty() -> bool:
+    """Report whether prompts can be answered; tests replace this."""
+    return sys.stdin.isatty()
 
 
 def _fail(error: Exception, as_json: bool) -> NoReturn:
@@ -209,10 +215,18 @@ def create(
         err_console.print(
             "[yellow]Warning:[/] --no-input is deprecated; use -y/--yes. It will be removed in 4.0."
         )
+    # Machine output never prompts, so --json implies --yes.
+    unattended = yes or no_input or as_json
+    if not unattended and not _stdin_is_tty():
+        _fail(
+            RequestError(
+                "Cannot prompt for answers: standard input is not a terminal. Pass -y/--yes to "
+                "accept the template defaults, and --data KEY=VALUE to set individual answers."
+            ),
+            as_json,
+        )
     _render_and_report(
-        lambda: opts.build(
-            project_name, no_input=yes or no_input, overwrite=force, dry_run=dry_run
-        ),
+        lambda: opts.build(project_name, no_input=unattended, overwrite=force, dry_run=dry_run),
         as_json,
     )
 

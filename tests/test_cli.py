@@ -372,3 +372,28 @@ def test_no_input_is_hidden_from_help() -> None:
 
     assert "--yes" in result.output
     assert "--no-input" not in result.output
+
+
+def test_create_without_a_terminal_or_yes_exits_before_rendering(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("pytemplate.main._stdin_is_tty", lambda: False)
+
+    result = runner.invoke(app, ["create", "demo", "-o", str(tmp_path)])
+
+    assert result.exit_code == 1
+    assert "-y" in result.output
+    assert "--data KEY=VALUE" in result.output
+    assert not (tmp_path / "demo").exists()
+
+
+def test_json_implies_yes_and_never_prompts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("pytemplate.main._stdin_is_tty", lambda: False)
+
+    result = runner.invoke(app, ["create", "demo", "-o", str(tmp_path), "--json"])
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout)["ok"] is True
+    assert (tmp_path / "demo" / "pyproject.toml").is_file()
