@@ -463,3 +463,27 @@ def test_the_git_timeout_defaults_to_two_minutes(monkeypatch: pytest.MonkeyPatch
     monkeypatch.delenv("PYTEMPLATE_GIT_TIMEOUT", raising=False)
 
     assert packs._git_timeout() == 120.0
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is required")
+def test_a_full_commit_hash_is_accepted_as_the_ref(pack: Path, tmp_path: Path) -> None:
+    first = _tagged_pack(pack)
+    (pack / "NOTES.md").write_text("later\n", encoding="utf-8")
+    _commit_and_tag(pack, "v2.0.0")
+    _git(pack, "config", "uploadpack.allowAnySHA1InWant", "true")
+
+    with open_catalog(pack.as_uri(), first) as (_, source, root):
+        assert source.commit == first
+        assert source.ref == first
+        assert not (root / "NOTES.md").exists()
+        assert not (root / ".git").exists()
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is required")
+def test_an_unknown_commit_hash_is_a_pack_error(pack: Path, tmp_path: Path) -> None:
+    _tagged_pack(pack)
+    _git(pack, "config", "uploadpack.allowAnySHA1InWant", "true")
+
+    with pytest.raises(PackError, match="Could not fetch template pack"):
+        with open_catalog(pack.as_uri(), "0" * 40):
+            pass
