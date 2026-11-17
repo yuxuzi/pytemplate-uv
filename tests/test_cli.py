@@ -441,3 +441,22 @@ def test_nothing_close_gives_no_suggestion(tmp_path: Path) -> None:
 
     assert "Did you mean" not in result.stderr
     assert "Available profiles:" in result.stderr
+
+
+def test_create_prints_next_steps_with_the_package_substituted(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["create", "market-data-api", "-o", str(tmp_path), "-y"])
+
+    assert result.exit_code == 0, result.output
+    assert "Next steps:" in result.stdout
+    assert "  cd " in result.stdout
+    assert "uv run mypy market_data_api" in result.stdout
+    assert "{package}" not in result.stdout
+
+
+def test_next_steps_are_human_output_only(tmp_path: Path) -> None:
+    machine = runner.invoke(app, ["create", "demo", "-o", str(tmp_path), "--json"])
+    dry = runner.invoke(app, ["create", "demo2", "-o", str(tmp_path), "-y", "--dry-run"])
+
+    assert "Next steps" not in machine.stdout
+    assert "lifecycle_commands" in json.loads(machine.stdout)
+    assert "Next steps" not in dry.stdout

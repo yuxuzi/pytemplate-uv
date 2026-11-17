@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import shlex
 import sys
 from collections.abc import Callable, Iterator
 from dataclasses import asdict
@@ -168,10 +169,20 @@ def _request(
     return opts.build(project_name, **flags)
 
 
+def _print_next_steps(project_path: Path, resolution: Resolution, request: RenderRequest) -> None:
+    """Tell the user how to enter the new project and run the profile's lifecycle commands."""
+    package = request.data.get("package_name", request.project_name.replace("-", "_"))
+    console.print("\nNext steps:")
+    console.print(f"  cd {shlex.quote(str(project_path))}", markup=False)
+    for command in resolution.lifecycle_commands:
+        console.print(f"  {command.replace('{package}', package)}", markup=False)
+
+
 def _render_and_report(build: Callable[[], RenderRequest], as_json: bool) -> None:
     """Render one request and display an actionable outcome."""
     try:
-        result = render(build())
+        request = build()
+        result = render(request)
     except (*_REQUEST_ERRORS, RenderError) as error:
         _fail(error, as_json)
     if as_json:
@@ -195,6 +206,7 @@ def _render_and_report(build: Callable[[], RenderRequest], as_json: bool) -> Non
         f"[green]Created[/] '{result.profile.identifier}' project at {result.project_path}"
     )
     console.print(f"Components: {', '.join(result.resolution.component_ids) or 'none'}")
+    _print_next_steps(result.project_path, result.resolution, request)
 
 
 @app.command("create")
