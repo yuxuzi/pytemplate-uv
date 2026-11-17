@@ -1,0 +1,17 @@
+[project]
+site_name = "pytemplate-uv"
+site_description = "A deterministic application factory: uv-native Python and FastAPI projects."
+site_url = "https://yuxuzi.github.io/pytemplate-uv/"
+repo_url = "https://github.com/yuxuzi/pytemplate-uv"
+repo_name = "yuxuzi/pytemplate-uv"
+docs_dir = "site-src"
+site_dir = "site"
+nav = [
+  { "Home" = "index.md" },
+  { "Compatibility policy" = "compatibility.md" },
+  { "Contributing" = "contributing.md" },
+  { "Changelog" = "changelog.md" },
+]
+
+[project.theme]
+features = ["navigation.instant", "content.code.copy", "navigation.top"]
