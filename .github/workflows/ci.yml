@@ -34,6 +34,17 @@ jobs:
       - run: uv sync --locked
       - run: uv run pytest
 
+  lowest-direct:
+    # The declared lower bounds must work, not only the locked versions.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          python-version: "3.11"
+      - run: uv sync --resolution lowest-direct
+      - run: uv run --no-sync pytest
+
   generated-projects:
     # Render every distinct component set of each profile and run its own lifecycle commands
     # (sync, lint, format, strict mypy, tests, and component commands such as migrations).
