@@ -14,6 +14,25 @@ from pytemplate.main import app, create_project_app
 runner = make_runner()
 
 
+def test_no_cache_turns_off_the_pinned_pack_cache(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    requests: list[rendering.RenderRequest] = []
+    real = rendering.render
+
+    def capture(request: rendering.RenderRequest) -> rendering.RenderResult:
+        requests.append(request)
+        return real(request)
+
+    monkeypatch.setattr("pytemplate.main.render", capture)
+    for flags in ([], ["--no-cache"]):
+        arguments = ["create", "demo", "-o", str(tmp_path), "-y", "--dry-run", *flags]
+        result = runner.invoke(app, arguments)
+        assert result.exit_code == 0, result.output
+
+    assert [request.use_cache for request in requests] == [True, False]
+
+
 def test_help_describes_the_public_commands() -> None:
     result = runner.invoke(app, ["--help"])
 

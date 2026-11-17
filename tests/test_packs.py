@@ -395,7 +395,7 @@ def test_cli_refuses_a_moved_tag_as_an_invalid_request(pack: Path, tmp_path: Pat
             "demo",
             "-p",
             "tool",
-            "--no-input",
+            "-y",
             "-o",
             str(tmp_path / "out"),
             "--template",

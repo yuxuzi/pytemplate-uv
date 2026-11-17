@@ -250,7 +250,8 @@ pytemplate create my-tool -p tool --template gh:org/my-pack --template-ref v1.2.
 - Packs are selected explicitly for each request; nothing is discovered or installed.
 - They follow the same rules as the bundled templates:
   - they render with Copier's `unsafe=False`;
-  - `_tasks`, `_migrations`, `_jinja_extensions`, and symlinks are rejected.
+  - `_tasks`, `_migrations`, `_jinja_extensions`, `_external_data`, and symlinks are rejected,
+    including in files a pack's `copier.yml` includes.
 - Pack-generated projects record the pack's source and tag.
 - Projects from a git pack also record the commit and digest they were rendered from. To refuse a
   pack that changed, pin them:
@@ -258,6 +259,11 @@ pytemplate create my-tool -p tool --template gh:org/my-pack --template-ref v1.2.
   pytemplate create my-tool -p tool --template gh:org/my-pack --template-ref v1.2.0 \
     --template-commit <commit> --template-digest <digest> -y
   ```
+  `--template-ref` also accepts a full commit hash. A pack pinned to both a commit and a digest is
+  cached under your user cache directory and checked against the digest on every use. Pass
+  `--no-cache` (or set `PYTEMPLATE_NO_CACHE=1`) to fetch it again; `PYTEMPLATE_CACHE_DIR` moves
+  the cache. Git never prompts for credentials, and a clone stops after 120 seconds
+  (`PYTEMPLATE_GIT_TIMEOUT`).
 - See [docs/compatibility.md](docs/compatibility.md) for the versioning rules.
 
 ## Built for AI coding agents

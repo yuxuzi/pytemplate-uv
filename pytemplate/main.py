@@ -188,6 +188,7 @@ def _with_picked_components(opts: RequestOptions, as_json: bool) -> RequestOptio
             opts.template_ref,
             commit=opts.template_commit,
             digest=opts.template_digest,
+            use_cache=not opts.no_cache,
         ) as (catalog, _, _):
             chosen = choose_components(catalog.profile(opts.profile), catalog.component_map())
     except (*_REQUEST_ERRORS, RenderError) as error:

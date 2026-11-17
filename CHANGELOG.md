@@ -6,6 +6,54 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- `-y`/`--yes` on `create` accepts the template defaults without prompting.
+- A `library` profile: a typed package with tests and tooling, without a CLI. It offers `mcp`,
+  `release`, and `devcontainer`.
+- A `release` component for `python` and `library`: a PyPI trusted-publishing workflow on `v*`
+  tags that checks the tag against the project version and publishes with attestations.
+- A `devcontainer` component for every profile.
+- Every generated project has a `.github/dependabot.yml` for Actions and uv with a 7-day cooldown.
+- `pytemplate status [PATH]` lists the files changed, deleted, or added since generation, using
+  `.pytemplate.toml`. It never writes.
+- `create --git` makes a repository and a first commit, and `create --lock` runs `uv lock`. Both are
+  opt-in and never run on `--dry-run`.
+- In a terminal, `create` with no `-c` offers the profile's optional components to pick from.
+- Errors suggest the closest profile, component, schema, or `--data` key.
+- After `create`, the CLI prints the next steps: `cd`, then the profile's lifecycle commands.
+- Shell completion of profile and component identifiers.
+- `--template-ref` accepts a full commit hash.
+- A git pack pinned to both a commit and a digest is cached and re-verified on every use.
+  `--no-cache` or `PYTEMPLATE_NO_CACHE=1` turns this off; `PYTEMPLATE_CACHE_DIR` moves the cache.
+- `pytemplate.__version__`.
+- A documentation site, `SECURITY.md`, and issue forms.
+
+### Changed
+
+- Without `-y`, `create` refuses to start when stdin is not a terminal (exit 1), instead of failing
+  in Copier after rendering began. `--json` implies `-y`.
+- Errors and warnings go to stderr, unwrapped; JSON stays on stdout.
+- `create --dry-run` runs the template's answer validators, as `validate` does.
+- `validate` opens a template pack once instead of twice.
+- `pytemplate --help`, `--version`, and the list, describe, and schema commands no longer import
+  Copier; importing the CLI takes about a quarter of the time it did.
+- Git runs without credential prompts and with a 120-second timeout (`PYTEMPLATE_GIT_TIMEOUT`).
+- Pack safety checks parse YAML, including `!include`d files and flow style, and also refuse
+  `_external_data`.
+- Profile, component, manifest, and configuration errors are also `RequestError`s, so API callers
+  can catch one type. They are still `ValueError`s.
+- Generated workflows pin every Action to a commit SHA and check out without persisted
+  credentials. The `python` and `fastapi` profiles are now version 5.
+- Minimum versions: `copier>=9.5` and `typer>=0.15.4`, the oldest that pass the tests. `questionary`
+  is now a direct dependency.
+- The package is classified `Production/Stable`.
+
+### Deprecated
+
+- `--no-input`: use `-y`. It still works, hidden from `--help`, and prints a warning. It will be
+  removed in 4.0.
+
 ## [3.1.0] — 2026-11-11
 
 3.1.0 makes generated projects ready for AI coding agents. It also removes `pytemplate update`
