@@ -44,8 +44,12 @@ TemplateDigestOption = Annotated[
 ]
 ProfileOption = Annotated[str, typer.Option("--profile", "-p", help="Profile identifier")]
 OutputOption = Annotated[Path, typer.Option("--output-dir", "-o", help="Existing parent directory")]
+YesOption = Annotated[
+    bool, typer.Option("--yes", "-y", help="Accept template defaults without prompting")
+]
+# Deprecated spelling of --yes: hidden from help, warns once, removed in 4.0.
 NoInputOption = Annotated[
-    bool, typer.Option("--no-input", help="Accept template defaults without prompting")
+    bool, typer.Option("--no-input", hidden=True, help="Deprecated: use -y/--yes")
 ]
 ForceOption = Annotated[
     bool, typer.Option("--force", "-f", help="Allow overwriting an existing output")

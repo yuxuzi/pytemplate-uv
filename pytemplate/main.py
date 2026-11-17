@@ -25,6 +25,7 @@ from pytemplate.cli_options import (
     JsonOption,
     NameOption,
     NoInputOption,
+    YesOption,
     RequestOptions,
     TemplateOption,
     TemplateRefOption,
@@ -59,6 +60,7 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 console = Console()
+err_console = Console(stderr=True, soft_wrap=True)
 skill_app = typer.Typer(help="Install or print the AI agent skill for creating projects.")
 app.add_typer(skill_app, name="skill")
 
@@ -195,6 +197,7 @@ def create(
     ],
     opts: RequestOptions,
     as_json: bool,
+    yes: YesOption = False,
     no_input: NoInputOption = False,
     force: ForceOption = False,
     dry_run: Annotated[
@@ -202,8 +205,14 @@ def create(
     ] = False,
 ) -> None:
     """Create a project from a bundled profile or a template pack."""
+    if no_input:
+        err_console.print(
+            "[yellow]Warning:[/] --no-input is deprecated; use -y/--yes. It will be removed in 4.0."
+        )
     _render_and_report(
-        lambda: opts.build(project_name, no_input=no_input, overwrite=force, dry_run=dry_run),
+        lambda: opts.build(
+            project_name, no_input=yes or no_input, overwrite=force, dry_run=dry_run
+        ),
         as_json,
     )
 

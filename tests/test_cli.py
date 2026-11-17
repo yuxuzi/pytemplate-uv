@@ -49,7 +49,7 @@ def test_component_commands_describe_the_factory_contract() -> None:
 def test_create_dry_run_does_not_write_a_project(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
-        ["create", "market-data-api", "--output-dir", str(tmp_path), "--no-input", "--dry-run"],
+        ["create", "market-data-api", "--output-dir", str(tmp_path), "-y", "--dry-run"],
     )
 
     assert result.exit_code == 0, result.output
@@ -60,7 +60,7 @@ def test_create_dry_run_does_not_write_a_project(tmp_path: Path) -> None:
 def test_create_renders_the_python_profile(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
-        ["create", "market-data-api", "--output-dir", str(tmp_path), "--no-input"],
+        ["create", "market-data-api", "--output-dir", str(tmp_path), "-y"],
     )
 
     project = tmp_path / "market-data-api"
@@ -84,7 +84,7 @@ def test_create_renders_the_fastapi_profile_with_a_configured_database(tmp_path:
             "database",
             "--output-dir",
             str(tmp_path),
-            "--no-input",
+            "-y",
         ],
     )
 
@@ -100,7 +100,7 @@ def test_create_renders_the_fastapi_profile_with_a_configured_database(tmp_path:
 
 def test_default_fastapi_project_has_no_database(tmp_path: Path) -> None:
     result = runner.invoke(
-        app, ["create", "svc", "--profile", "fastapi", "-o", str(tmp_path), "--no-input"]
+        app, ["create", "svc", "--profile", "fastapi", "-o", str(tmp_path), "-y"]
     )
 
     assert result.exit_code == 0, result.output
@@ -113,7 +113,7 @@ def test_create_rejects_an_existing_output_without_force(tmp_path: Path) -> None
 
     result = runner.invoke(
         app,
-        ["create", "market-data-api", "--output-dir", str(tmp_path), "--no-input"],
+        ["create", "market-data-api", "--output-dir", str(tmp_path), "-y"],
     )
 
     assert result.exit_code == 1
@@ -123,7 +123,7 @@ def test_create_rejects_an_existing_output_without_force(tmp_path: Path) -> None
 def test_create_rejects_an_invalid_project_name(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
-        ["create", "Market Data", "--output-dir", str(tmp_path), "--no-input"],
+        ["create", "Market Data", "--output-dir", str(tmp_path), "-y"],
     )
 
     assert result.exit_code == 1
@@ -140,7 +140,7 @@ def test_create_rejects_a_component_not_supported_by_the_profile(tmp_path: Path)
             "database",
             "--output-dir",
             str(tmp_path),
-            "--no-input",
+            "-y",
         ],
     )
 
@@ -173,7 +173,7 @@ def test_create_accepts_template_data_and_describes_inputs(tmp_path: Path) -> No
             "market-data-api",
             "--output-dir",
             str(tmp_path),
-            "--no-input",
+            "-y",
             "--data",
             "description=Factor research toolkit",
         ],
@@ -214,7 +214,7 @@ def test_create_project_is_a_full_alias_of_create(tmp_path: Path) -> None:
             "fastapi",
             "--output-dir",
             str(tmp_path),
-            "--no-input",
+            "-y",
             "--data",
             "description=Alias check",
         ],
@@ -229,7 +229,7 @@ def test_create_project_is_a_full_alias_of_create(tmp_path: Path) -> None:
 def test_create_project_executable_runs_create_directly(tmp_path: Path) -> None:
     result = runner.invoke(
         create_project_app,
-        ["market-data-api", "-p", "fastapi", "-o", str(tmp_path), "--no-input"],
+        ["market-data-api", "-p", "fastapi", "-o", str(tmp_path), "-y"],
     )
 
     assert result.exit_code == 0, result.output
@@ -314,7 +314,7 @@ def test_validate_catches_answers_the_template_rejects() -> None:
 
 
 def test_create_json_reports_the_result(tmp_path: Path) -> None:
-    result = runner.invoke(app, ["create", "svc", "-o", str(tmp_path), "--no-input", "--json"])
+    result = runner.invoke(app, ["create", "svc", "-o", str(tmp_path), "-y", "--json"])
 
     payload = json.loads(result.output)
     assert result.exit_code == 0, result.output
@@ -329,7 +329,7 @@ def test_render_failure_exits_with_code_2(tmp_path: Path, monkeypatch: pytest.Mo
 
     monkeypatch.setattr(rendering, "run_copy", fail)
 
-    result = runner.invoke(app, ["create", "svc", "-o", str(tmp_path), "--no-input", "--json"])
+    result = runner.invoke(app, ["create", "svc", "-o", str(tmp_path), "-y", "--json"])
 
     assert result.exit_code == 2
     assert json.loads(result.output)["error"]["message"].endswith("disk full")
@@ -340,3 +340,35 @@ def test_bad_data_option_is_an_invalid_request() -> None:
 
     assert result.exit_code == 1
     assert "KEY=VALUE" in result.output
+
+
+def _tree(root: Path) -> dict[str, bytes]:
+    return {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
+
+
+def test_yes_and_the_deprecated_no_input_render_identical_projects(tmp_path: Path) -> None:
+    for name in ("a", "b", "c"):
+        (tmp_path / name).mkdir()
+
+    short = runner.invoke(app, ["create", "demo", "-o", str(tmp_path / "a"), "-y"])
+    long = runner.invoke(app, ["create", "demo", "-o", str(tmp_path / "b"), "--yes"])
+    old = runner.invoke(app, ["create", "demo", "-o", str(tmp_path / "c"), "--no-input"])
+
+    assert short.exit_code == long.exit_code == old.exit_code == 0
+    assert _tree(tmp_path / "a" / "demo") == _tree(tmp_path / "b" / "demo")
+    assert _tree(tmp_path / "a" / "demo") == _tree(tmp_path / "c" / "demo")
+    assert "--no-input is deprecated" in old.stderr
+    assert "-y" in old.stderr
+    assert old.stderr.count("deprecated") == 1
+    assert "deprecated" not in short.stderr
+
+
+def test_no_input_is_hidden_from_help() -> None:
+    result = runner.invoke(app, ["create", "--help"])
+
+    assert "--yes" in result.output
+    assert "--no-input" not in result.output
