@@ -21,7 +21,7 @@ from pytemplate.rendering import (
     render,
 )
 
-PROFILES = ("python", "fastapi")
+PROFILES = ("python", "library", "fastapi")
 SOURCE_ROOT = Path(__file__).parent.parent / "pytemplate"
 
 
@@ -147,11 +147,14 @@ def test_failed_render_leaves_no_partial_output(
 
 @pytest.mark.parametrize("profile", PROFILES)
 def test_generated_projects_depend_only_on_uv(profile: str, tmp_path: Path) -> None:
-    project = _render(profile, tmp_path, components=("container",))
+    # A library has no container component; it is checked without one.
+    components = () if profile == "library" else ("container",)
+    project = _render(profile, tmp_path, components=components)
     tree = _tree(project)
 
     assert not [name for name in tree if Path(name).name == "Makefile"]
-    assert not re.search(r"\bmake\b", tree["Dockerfile"].decode("utf-8"))
+    if components:
+        assert not re.search(r"\bmake\b", tree["Dockerfile"].decode("utf-8"))
     assert not re.search(r"\bpip install\b", tree["README.md"].decode("utf-8"))
     pyproject = tree["pyproject.toml"].decode("utf-8")
     assert "[dependency-groups]" in pyproject
@@ -315,3 +318,23 @@ def test_package_exposes_the_generator_version() -> None:
     import pytemplate
 
     assert pytemplate.__version__ == generator_version()
+
+
+@pytest.mark.parametrize("profile", PROFILES)
+def test_generated_workflows_are_pinned_and_kept_current(profile: str, tmp_path: Path) -> None:
+    chosen = tuple(c for c in get_profile(profile).optional_components if c == "release")
+    project = _render(profile, tmp_path, components=chosen)
+    workflows = sorted((project / ".github" / "workflows").glob("*.yml"))
+    assert workflows
+
+    for workflow in workflows:
+        text = workflow.read_text(encoding="utf-8")
+        for line in text.splitlines():
+            if "uses:" in line:
+                assert re.search(r"uses: [\w./-]+@[0-9a-f]{40} # v\d", line), (workflow.name, line)
+        assert text.count("persist-credentials: false") == text.count("actions/checkout@")
+
+    dependabot = yaml.safe_load((project / ".github" / "dependabot.yml").read_text("utf-8"))
+    updates = {entry["package-ecosystem"]: entry for entry in dependabot["updates"]}
+    assert set(updates) == {"github-actions", "uv"}
+    assert all(entry["cooldown"]["default-days"] >= 7 for entry in updates.values())

@@ -1,0 +1,34 @@
+"""Tests for the MCP server; tools are called through the server, as a client would."""
+
+import asyncio
+
+from mcp.types import CallToolResult
+
+from {{ package_name }}.mcp_server import server
+
+
+def _call(name: str, arguments: dict[str, object]) -> CallToolResult:
+    result = asyncio.run(server.call_tool(name, arguments))
+    assert isinstance(result, CallToolResult)
+    return result
+
+
+def test_tools_are_listed_with_typed_arguments() -> None:
+    tools = {tool.name: tool for tool in asyncio.run(server.list_tools())}
+
+    assert set(tools) == {"greet"}
+    assert tools["greet"].input_schema["required"] == ["name"]
+    assert tools["greet"].description
+
+
+def test_greet_tool_returns_the_core_result() -> None:
+    result = _call("greet", {"name": "Ada"})
+
+    assert not result.is_error
+    assert result.structured_content == {"result": "Hello, Ada!"}
+
+
+def test_greet_tool_formal() -> None:
+    result = _call("greet", {"name": "Ada", "formal": True})
+
+    assert result.structured_content == {"result": "Greetings, esteemed Ada."}

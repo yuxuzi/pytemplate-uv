@@ -1,0 +1,11 @@
+"""Tests for the core logic."""
+
+from {{ package_name }}.core import greet
+
+
+def test_greet_is_informal_by_default() -> None:
+    assert greet("Ada") == "Hello, Ada!"
+
+
+def test_greet_formal() -> None:
+    assert greet("Ada", formal=True) == "Greetings, esteemed Ada."

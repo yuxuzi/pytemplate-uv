@@ -1,0 +1,18 @@
+contract = 1
+id = "library"
+name = "Python library"
+description = "A typed Python package with tests and development tooling, and no command-line interface."
+version = "1"
+kind = "library"
+status = "stable"
+aliases = ["lib"]
+supported_python = ["3.11", "3.12", "3.13", "3.14", "3.15"]
+default_components = []
+optional_components = ["devcontainer", "mcp", "release"]
+dependencies = []
+questions = ["description", "author", "email", "python_version", "license"]
+lifecycle_commands = ["uv sync", "uv run ruff check .", "uv run ruff format --check .", "uv run mypy {package}", "uv run pytest"]
+security_posture = "No external services or secrets are required to render or test the default project."
+
+[dependency_groups]
+dev = ["mypy>=1.11", "pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.6"]

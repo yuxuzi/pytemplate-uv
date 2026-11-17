@@ -41,13 +41,16 @@ Use the JSON output, not guesses:
   `plan`, and `validate`. Treat a refusal as a sign the pack changed; never drop the pin to get past it.
 
 Choose the profile from what the user wants to build:
-- `python`: a library, a command-line tool, or an MCP server.
+- `python`: a command-line tool, or an MCP server.
+- `library`: a package others import, with no command-line interface (it may add an MCP server).
 - `fastapi`: an HTTP API or web service.
 
 If the request fits neither, say so instead of forcing a profile.
 
-For `python`, add `mcp` when the user wants an MCP server or tools an AI agent can call. It adds
+For `python` or `library`, add `mcp` when the user wants an MCP server or tools an AI agent can call. It adds
 a stdio server on the official `mcp` SDK, a `<project_name>-mcp` command, and a `.mcp.json`.
+Add `release` (`python` or `library`) when they want to publish to PyPI: it adds a trusted-publishing
+workflow, and the user must register a trusted publisher on PyPI once before the first tag.
 
 For `fastapi`, map the user's needs to components and add only what they asked for:
 - persistence, SQL, PostgreSQL, migrations: `database`;
@@ -55,6 +58,8 @@ For `fastapi`, map the user's needs to components and add only what they asked f
 - service-to-service keys: `auth-api-key`; user login through an identity provider:
   `auth-oidc` (choose one; `auth` is added automatically);
 - a Docker image: `container` (also available for `python`);
+- a VS Code or Codespaces development environment: `devcontainer` (also available for `python`
+  and `library`);
 - `auth` is never selected by itself; it comes with `auth-api-key` or `auth-oidc`.
 
 ## 3. Collect inputs

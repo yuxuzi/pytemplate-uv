@@ -2,12 +2,12 @@ contract = 1
 id = "fastapi"
 name = "FastAPI service"
 description = "A layered FastAPI service: health and readiness, structured logs, and opt-in database, worker, and auth."
-version = "4"
+version = "5"
 kind = "service"
 status = "stable"
 supported_python = ["3.11", "3.12", "3.13", "3.14", "3.15"]
 default_components = ["api"]
-optional_components = ["auth", "auth-api-key", "auth-oidc", "container", "database", "worker"]
+optional_components = ["auth", "auth-api-key", "auth-oidc", "container", "database", "devcontainer", "worker"]
 legacy_components = ["container", "database"]
 dependencies = ["rich>=13.7", "typer>=0.12"]
 questions = ["description", "author", "email", "python_version", "license"]

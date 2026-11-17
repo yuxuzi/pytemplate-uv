@@ -54,6 +54,21 @@ docker run --rm {{ project_name }} hello --name World
 ```
 
 {% endif -%}
+{% if 'release' in components -%}
+## Releasing
+
+`.github/workflows/release.yml` publishes to PyPI when you push a tag that matches the
+project version, using [trusted publishing](https://docs.pypi.org/trusted-publishers/);
+no token is stored. Once, before the first release: on PyPI, add a trusted publisher
+for this repository with workflow `release.yml` and environment `pypi`, and create the
+`pypi` environment in the repository settings.
+
+```bash
+uv version 0.2.0      # bump the version, commit, and merge
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+{% endif -%}
 ## Project layout
 
 ```

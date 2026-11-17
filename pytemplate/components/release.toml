@@ -1,0 +1,13 @@
+contract = 1
+id = "release"
+name = "PyPI release workflow"
+description = "A GitHub Actions workflow that tests, builds, and publishes to PyPI with trusted publishing when a v* tag matches the project version."
+version = "1"
+status = "stable"
+compatible_profiles = ["library", "python"]
+paths = [".github/workflows/release.yml"]
+security_notes = [
+    "Publishing uses PyPI trusted publishing (OIDC), so no token is stored. Before the first release, add a trusted publisher on PyPI for this repository with workflow release.yml and environment pypi, and create the pypi environment in GitHub, ideally with a required reviewer.",
+    "Only the publish job has id-token: write; the build job has read-only contents. Actions are pinned to commit SHAs, which Dependabot keeps current.",
+    "The workflow refuses to publish when the tag differs from the project version. Protect v* tags so only maintainers can create them.",
+]

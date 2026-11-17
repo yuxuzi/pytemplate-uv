@@ -9,6 +9,7 @@ profile:
   help: Project profile
   choices:
     - python
+    - library
     - fastapi
 
 project_name:
@@ -35,7 +36,9 @@ description:
     Use non-empty text on one line without double quotes or backslashes.
     {% endif %}
   help: One-line project description
-  default: "{{ 'A FastAPI service' if profile == 'fastapi' else 'A Python package' }}"
+  default: >-
+    {{ 'A FastAPI service' if profile == 'fastapi'
+    else 'A Python library' if profile == 'library' else 'A Python package' }}
 
 author:
   type: str
@@ -89,7 +92,9 @@ components:
     - cli
     - container
     - database
+    - devcontainer
     - mcp
+    - release
     - worker
   default: []
 
