@@ -491,3 +491,25 @@ def test_shell_completion_runs_through_the_cli(monkeypatch: pytest.MonkeyPatch) 
     result = runner.invoke(app, [])
 
     assert "fastapi" in result.output
+
+
+def test_validate_opens_the_catalog_once_and_refuses_an_existing_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    opened: list[int] = []
+    real = rendering.open_catalog
+
+    def counting(*args: object, **kwargs: object) -> object:
+        opened.append(1)
+        return real(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(rendering, "open_catalog", counting)
+    ok = runner.invoke(app, ["validate", "--name", "demo", "-o", str(tmp_path), "--json"])
+    (tmp_path / "demo").mkdir()
+    exists = runner.invoke(app, ["validate", "--name", "demo", "-o", str(tmp_path)])
+
+    assert ok.exit_code == 0, ok.output
+    assert "files" not in json.loads(ok.stdout)
+    assert exists.exit_code == 1
+    assert "Output already exists" in exists.stderr
+    assert len(opened) == 2

@@ -52,7 +52,6 @@ from pytemplate.rendering import (
     generator_version,
     plan,
     render,
-    validate_request,
 )
 from pytemplate.resolution import Resolution
 from pytemplate.schema import SCHEMAS
@@ -448,8 +447,12 @@ def validate_config(
     """Validate a render request, including template answers, without writing the project."""
     try:
         request = _request(config, project_name, opts, dry_run=True)
-        resolution, project_path = validate_request(request)
         planned = plan(request)
+        if planned.target_exists and not request.overwrite:
+            raise RequestError(
+                f"Output already exists: {planned.project_path}. Re-run with --force only if "
+                "overwriting is intended."
+            )
     except (*_REQUEST_ERRORS, RenderError) as error:
         _fail(error, as_json)
     if as_json:
@@ -457,7 +460,8 @@ def validate_config(
         del payload["files"]
         _echo_json(payload)
         return
-    console.print(f"[green]Valid[/] {resolution.profile.identifier} -> {project_path}")
+    resolution = planned.resolution
+    console.print(f"[green]Valid[/] {resolution.profile.identifier} -> {planned.project_path}")
     console.print(f"Components: {', '.join(resolution.component_ids) or 'none'}")
     if resolution.added:
         console.print(f"Added by requirements: {', '.join(resolution.added)}")
