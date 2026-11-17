@@ -5,11 +5,12 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
+from pytemplate.errors import RequestError
 from pytemplate.packs import is_git_source
 from pytemplate.rendering import RenderRequest
 
 
-class ConfigurationError(ValueError):
+class ConfigurationError(RequestError, ValueError):
     """Raised when a render-request configuration is malformed."""
 
 
