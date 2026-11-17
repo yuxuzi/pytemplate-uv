@@ -309,6 +309,75 @@ def _read_pack(root: Path) -> tuple[str, str]:
     return str(data["id"]), str(data["version"])
 
 
+def cache_dir() -> Path:
+    """Return the directory for cached template packs.
+
+    ``PYTEMPLATE_CACHE_DIR`` wins; otherwise the user cache directory of the platform.
+    """
+    override = os.environ.get("PYTEMPLATE_CACHE_DIR")
+    if override:
+        return Path(override).expanduser()
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Caches" / "pytemplate-uv"
+    if sys.platform == "win32":
+        base = os.environ.get("LOCALAPPDATA")
+        return (
+            (Path(base) if base else Path.home() / "AppData" / "Local") / "pytemplate-uv" / "Cache"
+        )
+    base = os.environ.get("XDG_CACHE_HOME")
+    return (Path(base) if base else Path.home() / ".cache") / "pytemplate-uv"
+
+
+def _cache_enabled(use_cache: bool) -> bool:
+    disabled = os.environ.get("PYTEMPLATE_NO_CACHE", "").strip().lower()
+    return use_cache and disabled in ("", "0", "false", "no")
+
+
+def _check_fetched(
+    template: str, ref: str | None, fetched: str, contents: str, commit: str, digest: str
+) -> None:
+    if fetched != commit:
+        raise PackError(
+            f"Template pack '{template}' at {ref} is commit {fetched}, not the pinned "
+            f"{commit}. The tag may have moved; nothing was rendered."
+        )
+    if contents != digest:
+        raise PackError(
+            f"Template pack '{template}' at {ref} has digest {contents}, not the pinned "
+            f"{digest}. Nothing was rendered."
+        )
+
+
+def _cached_pack(template: str, ref: str | None, commit: str, digest: str) -> Path:
+    """Return a verified local copy of a pack pinned to ``commit`` and ``digest``.
+
+    The copy lives in the cache, keyed by both pins. It is verified against the digest on every
+    use; a copy that no longer matches is discarded and fetched again. A new copy is written
+    beside its final place and moved in with one rename, so a reader never sees half of one.
+    """
+    packs_dir = cache_dir() / "packs"
+    target = packs_dir / f"{commit}-{digest}"
+    if target.is_dir():
+        if pack_digest(target) == digest:
+            return target
+        _remove_tree(target)
+    packs_dir.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=".fetch-", dir=packs_dir))
+    try:
+        fetched = _clone(template, ref, staging / "pack")
+        contents = pack_digest(staging / "pack")
+        _check_fetched(template, ref, fetched, contents, commit, digest)
+        try:
+            os.replace(staging / "pack", target)
+        except OSError:
+            # Another process stored the same pack first.
+            if not (target.is_dir() and pack_digest(target) == digest):
+                raise
+    finally:
+        _remove_tree(staging)
+    return target
+
+
 @contextmanager
 def open_catalog(
     template: str | None = None,
@@ -317,6 +386,7 @@ def open_catalog(
     bundled_location: str = "",
     commit: str | None = None,
     digest: str | None = None,
+    use_cache: bool = True,
 ) -> Iterator[tuple[Catalog, TemplateSource, Path]]:
     """Yield the catalog, its recorded source, and a local Copier template directory.
 
@@ -326,6 +396,10 @@ def open_catalog(
 
     ``commit`` and ``digest`` pin a git source: the pack is refused, before any of it is read, if
     ``ref`` no longer resolves to that commit or its files no longer match that digest.
+
+    A git source pinned to both a commit and a digest is immutable, so it is cached under the
+    user cache directory and verified on each use. ``use_cache=False`` or the environment
+    variable ``PYTEMPLATE_NO_CACHE=1`` fetches it every time instead.
     """
     _check_pin(template, ref, commit, digest)
     if template is None:
@@ -337,13 +411,22 @@ def open_catalog(
     with tempfile.TemporaryDirectory(prefix="pytemplate-pack-") as scratch:
         fetched: str | None = None
         if is_git_source(template) or ref:
-            root = Path(scratch) / "pack"
-            fetched = _clone(template, ref, root)
-            if commit is not None and fetched != commit:
-                raise PackError(
-                    f"Template pack '{template}' at {ref} is commit {fetched}, not the pinned "
-                    f"{commit}. The tag may have moved; nothing was rendered."
-                )
+            if (
+                commit is not None
+                and digest is not None
+                and is_git_source(template)
+                and _cache_enabled(use_cache)
+            ):
+                root = _cached_pack(template, ref, commit, digest)
+                fetched = commit
+            else:
+                root = Path(scratch) / "pack"
+                fetched = _clone(template, ref, root)
+                if commit is not None and fetched != commit:
+                    raise PackError(
+                        f"Template pack '{template}' at {ref} is commit {fetched}, not the "
+                        f"pinned {commit}. The tag may have moved; nothing was rendered."
+                    )
             location = template
         else:
             root = Path(template).expanduser().resolve()

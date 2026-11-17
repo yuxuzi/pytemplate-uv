@@ -80,7 +80,8 @@ class RenderRequest:
 
     ``template`` selects an external template pack (a directory or git source) and
     ``template_ref`` a git tag or branch of it; leave both unset for the bundled templates.
-    ``template_commit`` and ``template_digest`` refuse a git pack that no longer matches them.
+    ``template_commit`` and ``template_digest`` refuse a git pack that no longer matches them; a
+    pack pinned to both is cached unless ``use_cache`` is false.
     """
 
     profile_id: str
@@ -95,6 +96,7 @@ class RenderRequest:
     template_ref: str | None = None
     template_commit: str | None = None
     template_digest: str | None = None
+    use_cache: bool = True
 
 
 def _open_request_catalog(
@@ -105,6 +107,7 @@ def _open_request_catalog(
         request.template_ref,
         commit=request.template_commit,
         digest=request.template_digest,
+        use_cache=request.use_cache,
     )
 
 

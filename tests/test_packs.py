@@ -542,3 +542,107 @@ def test_unknown_yaml_tags_and_broken_yaml_are_rejected(pack: Path, tmp_path: Pa
     (pack / "extra.yml").write_text("a: [unclosed\n", encoding="utf-8")
     with pytest.raises(PackError, match="not valid YAML"):
         render(_request(pack, tmp_path))
+
+
+@pytest.fixture(autouse=True)
+def _isolated_cache(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> Path:
+    """Keep every test away from the real user cache."""
+    cache = tmp_path_factory.mktemp("cache")
+    monkeypatch.setenv("PYTEMPLATE_CACHE_DIR", str(cache))
+    monkeypatch.delenv("PYTEMPLATE_NO_CACHE", raising=False)
+    return cache
+
+
+def _full_pin(pack: Path, tmp_path: Path) -> dict[str, str]:
+    commit = _tagged_pack(pack)
+    digest = plan(_pinned(pack, tmp_path)).source.digest
+    assert digest is not None
+    return {"template_commit": commit, "template_digest": digest}
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is required")
+def test_a_pack_pinned_to_commit_and_digest_is_cached(
+    pack: Path, tmp_path: Path, _isolated_cache: Path
+) -> None:
+    pins = _full_pin(pack, tmp_path)
+    assert not (_isolated_cache / "packs").exists()
+
+    render(_pinned(pack, tmp_path, **pins))
+
+    entry = _isolated_cache / "packs" / f"{pins['template_commit']}-{pins['template_digest']}"
+    assert (entry / "pytemplate-pack.toml").is_file()
+    assert not (entry / ".git").exists()
+    assert [item.name for item in (_isolated_cache / "packs").iterdir()] == [entry.name]
+
+    # The repository can disappear: the second run comes from the cache.
+    shutil.rmtree(pack / ".git")
+    result = render(_pinned(pack, tmp_path, overwrite=True, **pins))
+    assert result.source.commit == pins["template_commit"]
+    assert result.source.digest == pins["template_digest"]
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is required")
+def test_a_changed_cache_entry_is_discarded_and_fetched_again(
+    pack: Path, tmp_path: Path, _isolated_cache: Path
+) -> None:
+    pins = _full_pin(pack, tmp_path)
+    render(_pinned(pack, tmp_path, **pins))
+    entry = _isolated_cache / "packs" / f"{pins['template_commit']}-{pins['template_digest']}"
+    (entry / "tool" / "template" / "README.md.jinja").write_text("tampered\n", encoding="utf-8")
+
+    result = render(_pinned(pack, tmp_path, overwrite=True, **pins))
+
+    assert pack_digest(entry) == pins["template_digest"]
+    assert result.source.digest == pins["template_digest"]
+    assert "tampered" not in (result.project_path / "README.md").read_text(encoding="utf-8")
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is required")
+def test_pack_cache_is_skipped_when_not_fully_pinned_or_disabled(
+    pack: Path, tmp_path: Path, _isolated_cache: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pins = _full_pin(pack, tmp_path)
+
+    render(_pinned(pack, tmp_path, template_commit=pins["template_commit"]))
+    render(_pinned(pack, tmp_path, overwrite=True, template_digest=pins["template_digest"]))
+    render(_pinned(pack, tmp_path, overwrite=True, use_cache=False, **pins))
+    monkeypatch.setenv("PYTEMPLATE_NO_CACHE", "1")
+    render(_pinned(pack, tmp_path, overwrite=True, **pins))
+
+    assert not (_isolated_cache / "packs").exists()
+
+
+@pytest.mark.parametrize(
+    ("platform", "env", "expected"),
+    [
+        ("darwin", {}, ("Library", "Caches", "pytemplate-uv")),
+        ("linux", {}, (".cache", "pytemplate-uv")),
+        ("linux", {"XDG_CACHE_HOME": "XDG"}, ("XDG", "pytemplate-uv")),
+        ("win32", {"LOCALAPPDATA": "LOCAL"}, ("LOCAL", "pytemplate-uv", "Cache")),
+    ],
+)
+def test_cache_dir_follows_the_platform(
+    platform: str,
+    env: dict[str, str],
+    expected: tuple[str, ...],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("PYTEMPLATE_CACHE_DIR")
+    for name in ("XDG_CACHE_HOME", "LOCALAPPDATA"):
+        monkeypatch.delenv(name, raising=False)
+    for name, value in env.items():
+        monkeypatch.setenv(name, str(tmp_path / value))
+    monkeypatch.setattr(packs.sys, "platform", platform)
+    monkeypatch.setattr(packs.Path, "home", lambda: tmp_path / "home")
+    base = tmp_path if env else tmp_path / "home"
+
+    assert packs.cache_dir() == base.joinpath(*expected)
+
+
+def test_cache_dir_can_be_overridden(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PYTEMPLATE_CACHE_DIR", str(tmp_path / "mine"))
+
+    assert packs.cache_dir() == tmp_path / "mine"
