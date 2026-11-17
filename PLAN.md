@@ -145,8 +145,8 @@ small (2,600 lines), layered, and well tested. The findings below were reproduce
 
 ### Release
 
-- [ ] 32. CHANGELOG (done), version 3.2.0, `uv.lock`, and the hub's commands updated to `-y` after
-        release.
+- [x] 32. CHANGELOG, version 3.2.0, and `uv.lock`.
+- [ ] 32a. After release: the hub's generated commands use `-y`.
 - [ ] 33. Maintainer only: confirm CI is green on all runners, then tag `v3.2.0`.
 
 ## 4. Acceptance criteria
