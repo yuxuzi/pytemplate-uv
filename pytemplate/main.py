@@ -38,6 +38,7 @@ from pytemplate.configuration import ConfigurationError, load_render_request
 from pytemplate.errors import RenderError, RequestError
 from pytemplate.packs import open_catalog
 from pytemplate.picker import choose_components
+from pytemplate.post_create import run_post_steps
 from pytemplate.profiles import (
     Catalog,
     Component,
@@ -194,11 +195,16 @@ def _with_picked_components(opts: RequestOptions, as_json: bool) -> RequestOptio
     return replace(opts, component=chosen or None)
 
 
-def _render_and_report(build: Callable[[], RenderRequest], as_json: bool) -> None:
+def _render_and_report(
+    build: Callable[[], RenderRequest],
+    as_json: bool,
+    after: Callable[[Path], list[str]] | None = None,
+) -> None:
     """Render one request and display an actionable outcome."""
     try:
         request = build()
         result = render(request)
+        steps = after(result.project_path) if after and not result.dry_run else []
     except (*_REQUEST_ERRORS, RenderError) as error:
         _fail(error, as_json)
     if as_json:
@@ -222,6 +228,8 @@ def _render_and_report(build: Callable[[], RenderRequest], as_json: bool) -> Non
         f"[green]Created[/] '{result.profile.identifier}' project at {result.project_path}"
     )
     console.print(f"Components: {', '.join(result.resolution.component_ids) or 'none'}")
+    for step in steps:
+        console.print(f"[green]Also[/] {step}")
     _print_next_steps(result.project_path, result.resolution, request)
 
 
@@ -238,6 +246,12 @@ def create(
     force: ForceOption = False,
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Validate and show the target without writing files")
+    ] = False,
+    git: Annotated[
+        bool, typer.Option("--git", help="Run git init and make the first commit afterwards")
+    ] = False,
+    lock: Annotated[
+        bool, typer.Option("--lock", help="Run `uv lock` in the new project afterwards")
     ] = False,
 ) -> None:
     """Create a project from a bundled profile or a template pack."""
@@ -260,6 +274,7 @@ def create(
     _render_and_report(
         lambda: opts.build(project_name, no_input=unattended, overwrite=force, dry_run=dry_run),
         as_json,
+        after=(lambda path: run_post_steps(path, git=git, lock=lock)) if git or lock else None,
     )
 
 
