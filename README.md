@@ -24,7 +24,8 @@ ready-to-deploy project.
 
 ### Profiles (choose one)
 
-- **`python`** — a typed package with a Typer CLI; great for tools and libraries
+- **`python`** — a typed package with a Typer CLI; great for tools
+- **`library`** — a typed package with no CLI or console script; great for code others import
 - **`fastapi`** — a layered REST API service with structured logging, health checks, security, and organized architecture
 
 ### Components (mix and match)
@@ -36,7 +37,7 @@ ready-to-deploy project.
 | `auth-api-key` | API key authentication with scopes | For service-to-service auth |
 | `auth-oidc` | OpenID Connect (JWT) authentication | For user login via identity provider |
 | `container` | Dockerfile and `.dockerignore` | For containerized deployment |
-| `mcp` | An MCP server over stdio, with a typed tool, a test, and `.mcp.json` (`python` profile) | To give AI agents tools they can call |
+| `mcp` | An MCP server over stdio, with a typed tool, a test, and `.mcp.json` (`python` and `library` profiles) | To give AI agents tools they can call |
 
 Mix components freely — the generator validates combinations and adds required dependencies.
 

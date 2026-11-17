@@ -1,0 +1,52 @@
+# AGENTS.md
+
+Guidance for coding agents working in `{{ project_name }}`. `CLAUDE.md` imports this file.
+
+## Project
+
+{{ description.rstrip('.') }}. A typed Python {{ python_version }}+ library (`{{ package_name }}`) with no command-line interface. `uv` is the only required tool: never use pip, virtualenv activation, or make.
+
+## Commands
+
+- Install or refresh the environment: `uv sync`
+- Test: `uv run pytest`
+- Lint: `uv run ruff check .`
+- Format: `uv run ruff format .` (check only: `uv run ruff format --check .`)
+- Type-check: `uv run mypy {{ package_name }}`
+- Build the sdist and wheel: `uv build`
+{%- if 'mcp' in components %}
+- Run the MCP server over stdio: `uv run {{ project_name }}-mcp` (registered for agents in `.mcp.json`)
+{%- endif %}
+- One-off tools without installing them: `uvx <tool>` (for example `uvx pre-commit run --all-files`)
+
+## Layout
+
+- `{{ package_name }}/core.py` — the library's logic, free of I/O concerns.
+{%- if 'mcp' in components %}
+- `{{ package_name }}/mcp_server.py` — MCP tools for AI agents; a thin layer that calls `core`.
+{%- endif %}
+- `tests/` — pytest suite, one test module per source module.
+- `pyproject.toml` — dependencies, the `dev` dependency group, and all tool configuration.
+
+## Conventions
+
+- Type-annotate everything; mypy runs in strict mode and must stay clean.
+- Ruff owns formatting and import order; do not hand-format.
+- Add runtime dependencies with `uv add <package>` and tools with `uv add --dev <package>`; never edit `uv.lock` by hand.
+- Keep the public API small and typed; everything a user may import is documented with a docstring.
+{%- if 'mcp' in components %}
+- Each MCP tool is a typed function with a docstring; the model reads both. Mark tools that change nothing with `read_only_hint`, and never print to stdout in the server.
+- Test tools through `server.call_tool`, as `tests/test_mcp_server.py` does.
+{%- endif %}
+
+## Testing
+
+- Add or update tests with every behavior change, including the failure path.
+- Before reporting work as done, run the test, lint, format, and type-check commands above and report the real results.
+- Tests must not use the network or real credentials.
+
+## Safety
+
+- Never read, print, or commit `.env` files, tokens, or other secrets.
+- Do not change CI workflows, release configuration, or dependency version bounds without asking first.
+- Prefer small, reviewable diffs; explain any change that touches more than one module.

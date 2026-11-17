@@ -129,7 +129,7 @@ def test_answers_and_manifest_record_the_resolution(
     manifest = tomllib.loads((project / ".pytemplate.toml").read_text(encoding="utf-8"))
 
     assert answers["components"] == list(resolution.component_ids)
-    assert [entry["id"] for entry in manifest["components"]] == list(resolution.component_ids)
+    assert [entry["id"] for entry in manifest.get("components", [])] == list(resolution.component_ids)
     owners = {entry["path"]: entry["owner"] for entry in manifest["files"]}
     assert set(owners.values()) <= {"profile", *resolution.component_ids}
 

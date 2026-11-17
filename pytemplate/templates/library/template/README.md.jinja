@@ -1,0 +1,61 @@
+# {{ project_name }}
+
+{{ description }}
+
+## Requirements
+
+[uv](https://docs.astral.sh/uv/) is the only tool you need. It installs Python {{ python_version }}+
+and every development tool on demand, on Windows, macOS, and Linux.
+
+## Getting started
+
+```bash
+uv sync                      # create .venv and install the project with its dev group
+uv lock                      # create uv.lock, then commit it for reproducible installs
+uv run python -c "from {{ package_name }}.core import greet; print(greet('World'))"
+```
+
+## Development
+
+| Task | Command |
+| --- | --- |
+| Run tests with coverage | `uv run pytest` |
+| Lint | `uv run ruff check .` |
+| Format | `uv run ruff format .` |
+| Type-check | `uv run mypy {{ package_name }}` |
+| Build sdist and wheel | `uv build` |
+| Install git hooks | `uvx pre-commit install` |
+
+Add runtime dependencies with `uv add <package>` and development tools with
+`uv add --dev <package>`.
+
+{% if 'mcp' in components -%}
+## MCP server
+
+`{{ package_name }}/mcp_server.py` exposes the package to AI agents as
+[Model Context Protocol](https://modelcontextprotocol.io) tools over stdio.
+
+```bash
+uv run {{ project_name }}-mcp          # serve; an MCP client starts this for you
+```
+
+`.mcp.json` registers the server for agents that work in this repository, such as Claude Code.
+To use it from another client, give that client the same command and arguments. Add a tool by
+decorating a typed function with `@server.tool()`.
+
+{% endif -%}
+## Project layout
+
+```
+{{ package_name }}/
+  core.py     # the library's logic
+{%- if 'mcp' in components %}
+  mcp_server.py  # MCP tools for AI agents (thin layer)
+{%- endif %}
+  py.typed    # marks the package as typed
+tests/        # pytest suite
+```
+
+## License
+
+{{ license }} — {{ author }} <{{ email }}>

@@ -101,7 +101,7 @@ def test_list_json_outputs_parse() -> None:
     components = json.loads(runner.invoke(app, ["list-components", "--json"]).output)
     component = json.loads(runner.invoke(app, ["describe-component", "api", "--json"]).output)
 
-    assert [profile["identifier"] for profile in profiles] == ["fastapi", "python"]
+    assert [profile["identifier"] for profile in profiles] == ["fastapi", "library", "python"]
     assert {item["identifier"] for item in components} == {
         "api",
         "auth",

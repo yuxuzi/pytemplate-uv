@@ -41,7 +41,8 @@ Use the JSON output, not guesses:
   `plan`, and `validate`. Treat a refusal as a sign the pack changed; never drop the pin to get past it.
 
 Choose the profile from what the user wants to build:
-- `python`: a library, a command-line tool, or an MCP server.
+- `python`: a command-line tool, or an MCP server.
+- `library`: a package others import, with no command-line interface (it may add an MCP server).
 - `fastapi`: an HTTP API or web service.
 
 If the request fits neither, say so instead of forcing a profile.

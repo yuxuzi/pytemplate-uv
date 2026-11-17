@@ -4,7 +4,7 @@ name = "MCP server"
 description = "A Model Context Protocol server over stdio that exposes the package's functions to AI agents as typed tools."
 version = "1"
 status = "stable"
-compatible_profiles = ["python"]
+compatible_profiles = ["library", "python"]
 dependencies = ["mcp>=2.0"]
 paths = ["{package}/mcp_server.py", "tests/test_mcp_server.py", ".mcp.json"]
 security_notes = [
