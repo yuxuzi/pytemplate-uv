@@ -17,6 +17,9 @@ Guidance for coding agents working in `{{ project_name }}`. `CLAUDE.md` imports 
 {%- if 'mcp' in components %}
 - Run the MCP server over stdio: `uv run {{ project_name }}-mcp` (registered for agents in `.mcp.json`)
 {%- endif %}
+{%- if 'release' in components %}
+- Release: bump the version with `uv version <new>`, merge, then push a tag `v<new>`; `.github/workflows/release.yml` publishes to PyPI
+{%- endif %}
 - One-off tools without installing them: `uvx <tool>` (for example `uvx pre-commit run --all-files`)
 
 ## Layout

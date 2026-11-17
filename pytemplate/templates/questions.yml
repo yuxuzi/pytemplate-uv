@@ -93,6 +93,7 @@ components:
     - container
     - database
     - mcp
+    - release
     - worker
   default: []
 

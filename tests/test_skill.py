@@ -111,6 +111,7 @@ def test_list_json_outputs_parse() -> None:
         "container",
         "database",
         "mcp",
+        "release",
         "worker",
     }
     assert component["compatible_profiles"] == ["fastapi"]
