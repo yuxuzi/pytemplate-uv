@@ -495,7 +495,8 @@ def schema_command(
     """Print a JSON Schema for a manifest, request, or generated-project file."""
     if name not in SCHEMAS:
         err_console.print(
-            f"[red]Error:[/] Unknown schema '{name}'.{did_you_mean(name, SCHEMAS)} Available: {', '.join(SCHEMAS)}."
+            f"[red]Error:[/] Unknown schema '{name}'.{did_you_mean(name, SCHEMAS)} "
+            f"Available: {', '.join(SCHEMAS)}."
         )
         raise typer.Exit(code=EXIT_INVALID)
     _echo_json(SCHEMAS[name])
