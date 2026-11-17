@@ -12,6 +12,7 @@ from typing import Annotated, NoReturn
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from pytemplate.agent_skill import (
@@ -26,10 +27,10 @@ from pytemplate.cli_options import (
     JsonOption,
     NameOption,
     NoInputOption,
-    YesOption,
     RequestOptions,
     TemplateOption,
     TemplateRefOption,
+    YesOption,
     request_options,
 )
 from pytemplate.configuration import ConfigurationError, load_render_request
@@ -100,7 +101,7 @@ def _fail(error: Exception, as_json: bool) -> NoReturn:
             }
         )
     else:
-        console.print(f"[red]Error:[/] {error}")
+        err_console.print(f"[red]Error:[/] {escape(str(error))}")
     raise typer.Exit(code=code) from error
 
 
@@ -492,7 +493,9 @@ def schema_command(
 ) -> None:
     """Print a JSON Schema for a manifest, request, or generated-project file."""
     if name not in SCHEMAS:
-        console.print(f"[red]Error:[/] Unknown schema '{name}'. Available: {', '.join(SCHEMAS)}.")
+        err_console.print(
+            f"[red]Error:[/] Unknown schema '{name}'. Available: {', '.join(SCHEMAS)}."
+        )
         raise typer.Exit(code=EXIT_INVALID)
     _echo_json(SCHEMAS[name])
 
@@ -527,7 +530,7 @@ def skill_install(
         skills_dir = dest if dest is not None else default_skills_dir(project=project, agent=agent)
         target = install_skill(skills_dir, force=force)
     except SkillInstallError as error:
-        console.print(f"[red]Error:[/] {error}")
+        err_console.print(f"[red]Error:[/] {escape(str(error))}")
         raise typer.Exit(code=1) from error
     console.print(f"[green]Installed[/] skill at {target}")
 

@@ -397,3 +397,22 @@ def test_json_implies_yes_and_never_prompts(
     assert result.exit_code == 0, result.output
     assert json.loads(result.stdout)["ok"] is True
     assert (tmp_path / "demo" / "pyproject.toml").is_file()
+
+
+def test_errors_go_to_stderr_and_json_stays_on_stdout(tmp_path: Path) -> None:
+    (tmp_path / "demo").mkdir()
+    args = ["create", "demo", "-o", str(tmp_path), "-y"]
+
+    human = runner.invoke(app, args)
+    machine = runner.invoke(app, [*args, "--json"])
+    schema = runner.invoke(app, ["schema", "nope"])
+
+    assert human.exit_code == 1
+    assert human.stdout == ""
+    assert "Output already exists" in human.stderr
+    assert machine.exit_code == 1
+    assert json.loads(machine.stdout)["error"]["type"] == "RequestError"
+    assert machine.stderr == ""
+    assert schema.exit_code == 1
+    assert schema.stdout == ""
+    assert "Unknown schema" in schema.stderr
