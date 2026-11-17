@@ -11,6 +11,7 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
+from pytemplate import packs
 from pytemplate.configuration import load_render_request
 from pytemplate.errors import PackError, RenderError
 from pytemplate.main import app
@@ -426,3 +427,39 @@ def test_request_file_carries_the_pin(pack: Path, tmp_path: Path) -> None:
 
     assert request.template_commit == "a" * 40
     assert request.template_digest == "b" * 64
+
+
+def test_git_runs_without_prompts_and_with_a_timeout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: list[dict[str, object]] = []
+
+    def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        seen.append(kwargs)
+        raise subprocess.TimeoutExpired(command, 5)
+
+    monkeypatch.setattr(packs.subprocess, "run", fake_run)
+    monkeypatch.setenv("PYTEMPLATE_GIT_TIMEOUT", "5")
+
+    with pytest.raises(PackError, match=r"https://example.invalid/pack.git.*within 5 s"):
+        packs._clone("https://example.invalid/pack.git", None, tmp_path / "pack")
+
+    env = seen[0]["env"]
+    assert isinstance(env, dict)
+    assert env["GIT_TERMINAL_PROMPT"] == "0"
+    assert env["GCM_INTERACTIVE"] == "never"
+    assert seen[0]["timeout"] == 5.0
+
+
+@pytest.mark.parametrize("value", ["0", "-3", "soon"])
+def test_a_bad_git_timeout_is_a_pack_error(value: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PYTEMPLATE_GIT_TIMEOUT", value)
+
+    with pytest.raises(PackError, match="PYTEMPLATE_GIT_TIMEOUT"):
+        packs._git_timeout()
+
+
+def test_the_git_timeout_defaults_to_two_minutes(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("PYTEMPLATE_GIT_TIMEOUT", raising=False)
+
+    assert packs._git_timeout() == 120.0

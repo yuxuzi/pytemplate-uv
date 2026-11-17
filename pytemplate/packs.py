@@ -11,7 +11,7 @@ import subprocess
 import sys
 import tempfile
 import tomllib
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from importlib import resources
@@ -67,35 +67,92 @@ def _clone_url(location: str) -> str:
     return location.removeprefix("git+")
 
 
+DEFAULT_GIT_TIMEOUT = 120.0
+_GIT_TIMEOUT_ENV = "PYTEMPLATE_GIT_TIMEOUT"
+
+
+def _git_timeout() -> float:
+    """Return the seconds a git command may run, from ``PYTEMPLATE_GIT_TIMEOUT`` or 120."""
+    raw = os.environ.get(_GIT_TIMEOUT_ENV)
+    if raw is None or not raw.strip():
+        return DEFAULT_GIT_TIMEOUT
+    try:
+        seconds = float(raw)
+    except ValueError:
+        seconds = 0.0
+    if seconds <= 0:
+        raise PackError(f"{_GIT_TIMEOUT_ENV} must be a positive number of seconds, got '{raw}'.")
+    return seconds
+
+
+def _git_environment() -> dict[str, str]:
+    """Return an environment in which git never waits for a person to type a credential."""
+    return {**os.environ, "GIT_TERMINAL_PROMPT": "0", "GCM_INTERACTIVE": "never"}
+
+
+def _run_git(
+    git: str, args: Sequence[str], *, location: str, cwd: Path | None = None
+) -> subprocess.CompletedProcess[str]:
+    """Run git without prompts and with a timeout; a timeout is a ``PackError``."""
+    timeout = _git_timeout()
+    try:
+        return subprocess.run(
+            [git, "-c", "core.autocrlf=false", *args],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=False,
+            env=_git_environment(),
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise PackError(
+            f"Template pack '{location}': git {args[0]} did not finish within {timeout:g} s and "
+            f"was stopped. Check the URL and your network, or raise {_GIT_TIMEOUT_ENV}."
+        ) from error
+
+
+def _fetch_commit(git: str, url: str, commit: str, destination: Path, location: str) -> None:
+    """Fetch exactly ``commit`` (a full hash) into ``destination`` and check it out."""
+    destination.mkdir(parents=True)
+    for args in (
+        ["init", "--quiet"],
+        ["fetch", "--quiet", "--depth", "1", url, commit],
+        ["checkout", "--quiet", "FETCH_HEAD"],
+    ):
+        completed = _run_git(git, args, location=location, cwd=destination)
+        if completed.returncode != 0:
+            raise PackError(
+                f"Could not fetch template pack '{location}' at commit {commit}: "
+                f"{completed.stderr.strip()}"
+            )
+
+
 def _clone(location: str, ref: str | None, destination: Path) -> str:
     """Clone ``location`` at ``ref`` into a plain checkout and return its commit.
 
-    Line endings are not converted, so a pack has the same bytes and digest on every machine.
+    ``ref`` is a branch, a tag, or a full commit hash. Line endings are not converted, so a pack
+    has the same bytes and digest on every machine.
     """
     git = shutil.which("git")
     if git is None:
         raise PackError(f"git is required to use the template pack '{location}'; install git.")
-    command = [git, "-c", "core.autocrlf=false", "clone", "--quiet", "--depth", "1"]
-    if ref:
-        command += ["--branch", ref]
     url = _clone_url(location)
     if Path(url).is_dir():
         url = Path(url).resolve().as_uri()
-    completed = subprocess.run(
-        [*command, url, str(destination)], capture_output=True, text=True, check=False
-    )
-    if completed.returncode != 0:
-        raise PackError(
-            f"Could not clone template pack '{location}'"
-            f"{f' at {ref}' if ref else ''}: {completed.stderr.strip()}"
-        )
-    commit = subprocess.run(
-        [git, "rev-parse", "HEAD"],
-        cwd=destination,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    if ref and _COMMIT.match(ref):
+        _fetch_commit(git, url, ref, destination, location)
+    else:
+        command = ["clone", "--quiet", "--depth", "1"]
+        if ref:
+            command += ["--branch", ref]
+        completed = _run_git(git, [*command, url, str(destination)], location=location)
+        if completed.returncode != 0:
+            raise PackError(
+                f"Could not clone template pack '{location}'"
+                f"{f' at {ref}' if ref else ''}: {completed.stderr.strip()}"
+            )
+    commit = _run_git(git, ["rev-parse", "HEAD"], location=location, cwd=destination)
     if commit.returncode != 0:
         raise PackError(f"Could not read the commit of '{location}': {commit.stderr.strip()}")
     # Render from a plain checkout; the source, ref, and commit are recorded separately.
