@@ -11,6 +11,8 @@ from importlib import resources
 from importlib.resources.abc import Traversable
 from typing import Any
 
+from pytemplate.errors import RequestError
+
 CONTRACT_VERSION = 1
 PROFILE_KINDS = ("library", "cli", "service")
 PROFILE_STATUSES = ("stable", "experimental")
@@ -23,19 +25,19 @@ _IDENTIFIER = re.compile(r"^[a-z][a-z0-9-]*$")
 RESERVED_QUESTIONS = ("profile", "components")
 
 
-class ManifestError(ValueError):
+class ManifestError(RequestError, ValueError):
     """Raised when a profile or component manifest violates the factory contract."""
 
 
-class ProfileNotFoundError(ValueError):
+class ProfileNotFoundError(RequestError, ValueError):
     """Raised when a requested profile is not bundled with the package."""
 
 
-class ComponentNotFoundError(ValueError):
+class ComponentNotFoundError(RequestError, ValueError):
     """Raised when a requested component is not bundled with the package."""
 
 
-class ComponentCompatibilityError(ValueError):
+class ComponentCompatibilityError(RequestError, ValueError):
     """Raised when a component cannot be used with the selected profile."""
 
 
