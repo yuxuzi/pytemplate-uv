@@ -577,7 +577,7 @@ def test_a_pack_pinned_to_commit_and_digest_is_cached(
     assert [item.name for item in (_isolated_cache / "packs").iterdir()] == [entry.name]
 
     # The repository can disappear: the second run comes from the cache.
-    shutil.rmtree(pack / ".git")
+    packs._remove_tree(pack / ".git")
     result = render(_pinned(pack, tmp_path, overwrite=True, **pins))
     assert result.source.commit == pins["template_commit"]
     assert result.source.digest == pins["template_digest"]
