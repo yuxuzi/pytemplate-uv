@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## [3.2.0] — 2026-11-17
+
+3.2.0 makes the CLI friendlier and faster, adds a `library` profile with `release` and
+`devcontainer` components, and hardens the CI of both this project and the projects it
+generates. `--no-input` is deprecated in favour of `-y`.
+
 ### Added
 
 - `-y`/`--yes` on `create` accepts the template defaults without prompting.
