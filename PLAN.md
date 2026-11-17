@@ -112,20 +112,20 @@ small (2,600 lines), layered, and well tested. The findings below were reproduce
 
 - [ ] 17. A CI job that runs the unit tests with `uv sync --resolution lowest-direct`, and raise
         any lower bound that fails. (P1)
-- [?] 18. SHA-pin this repository's Actions, add zizmor to CI, and Dependabot for Actions. (P2;
+- [ ] 18. SHA-pin this repository's Actions, add zizmor to CI, and Dependabot for Actions. (P2;
         CI edit)
-- [?] 19. PEP 740 attestations on release. (P3; release-workflow edit)
+- [ ] 19. PEP 740 attestations on release. (P3; release-workflow edit)
 - [ ] 20. README badges (PyPI version, Python versions, CI, licence), a `Documentation` URL, a
         `SECURITY.md`, and issue templates for bugs and template requests. (P4, P5)
-- [?] 21. A docs site generated from the existing Markdown (MkDocs Material or Zensical) on
+- [ ] 21. A docs site generated from the existing Markdown (MkDocs Material or Zensical) on
         GitHub Pages. (P4; dev dependency and a Pages workflow)
-- [?] 22. Classifier `5 - Production/Stable`. (P6)
+- [ ] 22. Classifier `5 - Production/Stable`. (P6)
 
 ### Phase 4: features (one PR each)
 
 - [ ] 23. `library` profile: a package with tests and tooling but no CLI, `kind = "library"`. One
         combination per optional component. (U9)
-- [?] 24. Interactive component picker when `create` runs in a terminal with no `-c`: a
+- [ ] 24. Interactive component picker when `create` runs in a terminal with no `-c`: a
         multi-select of the profile's optional components, with `requires` added and
         `conflicts` refused as now. Needs `questionary` as a direct dependency (Copier already
         installs it). (U6)
@@ -136,12 +136,10 @@ small (2,600 lines), layered, and well tested. The findings below were reproduce
 - [ ] 27. `release` component for `python` and `library`: a trusted-publishing release
         workflow with a tag-equals-version check, like this repository's own.
 - [ ] 28. `devcontainer` component (already a 3.1 candidate).
-- [?] 29. SHA-pinned Actions and a dependency cooldown (`exclude-newer`) in generated CI. Needs
+- [ ] 29. SHA-pinned Actions and a dependency cooldown (`exclude-newer`) in generated CI. Needs
         a way to keep the pins current, since `update` is gone: Dependabot config in the
         generated project is the likely answer.
-- [?] 30. Deprecate the `create-project` executable in favour of `pytemplate create` and
-        `uvx pytemplate-uv create`; remove it in 4.0. (U10)
-- [?] 31. Cache git packs pinned to a commit and a digest, keyed by both, under the user cache
+- [ ] 31. Cache git packs pinned to a commit and a digest, keyed by both, under the user cache
         directory; `--no-cache` to bypass. Needs `platformdirs` or a small cache-path
         function. (C6)
 
