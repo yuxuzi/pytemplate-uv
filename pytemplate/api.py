@@ -9,8 +9,9 @@ releases::
     planned = api.plan(request)     # resolution and file list; writes nothing
     result = api.render(request)    # renders and publishes the project
 
-Errors: `RequestError` and the profile/component errors mean the request is invalid and nothing
-was written; any other `RenderError` means rendering or writing failed.
+Errors: catch `RequestError` for an invalid request (nothing was written); it covers
+`ConfigurationError`, `ManifestError`, `PackError`, and the profile and component errors, which are
+also `ValueError` for compatibility. Any other `RenderError` means rendering or writing failed.
 """
 
 from __future__ import annotations

@@ -284,6 +284,42 @@ def test_no_template_file_is_ignored_by_git() -> None:
     assert ignored.stdout == ""
 
 
+def test_importing_the_cli_does_not_import_copier() -> None:
+    """`--help` and the list commands must not pay for Copier's import."""
+    import subprocess
+    import sys
+
+    code = "import pytemplate.main, sys; assert 'copier' not in sys.modules"
+    subprocess.run([sys.executable, "-c", code], check=True)
+
+
+def test_dry_run_runs_the_answer_validators_and_writes_nothing(tmp_path: Path) -> None:
+    request = RenderRequest(
+        profile_id="python",
+        project_name="demo",
+        output_dir=tmp_path,
+        no_input=True,
+        dry_run=True,
+        data={"description": 'Say "hi"'},
+    )
+    with pytest.raises(RequestError, match="Copier rejected the answers"):
+        render(request)
+    assert list(tmp_path.iterdir()) == []
+
+    valid = RenderRequest(
+        profile_id="python", project_name="demo", output_dir=tmp_path, no_input=True, dry_run=True
+    )
+    result = render(valid)
+    assert result.dry_run and result.manifest_path is None
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_package_exposes_the_generator_version() -> None:
+    import pytemplate
+
+    assert pytemplate.__version__ == generator_version()
+
+
 @pytest.mark.parametrize("profile", PROFILES)
 def test_generated_workflows_are_pinned_and_kept_current(profile: str, tmp_path: Path) -> None:
     chosen = tuple(c for c in get_profile(profile).optional_components if c == "release")

@@ -4,6 +4,7 @@ from dataclasses import replace
 
 import pytest
 
+from pytemplate import api
 from pytemplate.profiles import (
     ManifestError,
     Setting,
@@ -150,3 +151,23 @@ def test_catalog_requires_component_question_choices_to_match_the_components() -
 
     with pytest.raises(ManifestError, match="choices are exactly the catalog's components"):
         check_catalog(replace(bundled_catalog(), questions=questions))
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        api.ConfigurationError,
+        api.ManifestError,
+        api.ProfileNotFoundError,
+        api.ComponentNotFoundError,
+        api.ComponentCompatibilityError,
+        api.PackError,
+    ],
+)
+def test_every_request_error_is_one_hierarchy(error: type[Exception]) -> None:
+    assert issubclass(error, api.RequestError)
+    assert issubclass(error, api.RenderError)
+    if error is not api.PackError:
+        assert issubclass(error, ValueError)
+    with pytest.raises(api.RequestError):
+        raise error("bad")
