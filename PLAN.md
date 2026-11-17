@@ -1,132 +1,173 @@
-# PLAN.md — pytemplate-uv 3.1: agent-ready projects
+# PLAN.md — pytemplate-uv 3.2: a friendlier CLI, a faster core, a stronger package
 
-This is the working plan for the next release. It adds what comparable generators offer for AI
-coding agents, where that fits a deterministic, safe factory. The 3.0 plan (factory contract,
-FastAPI foundation, authentication) is finished; its record is in the git history and the 3.0.0
-CHANGELOG entry.
+This is the working plan for the next release. The 3.1 plan (agent-ready projects) is finished
+and released to PyPI; its record is in the git history and the 3.1.0 CHANGELOG entry.
 
-Status key: `[x]` done and verified, `[ ]` open.
+Status key: `[x]` done and verified, `[ ]` open, `[?]` needs the maintainer's decision first.
 
-## 1. Comparison (2026-11-11)
+## 1. Review findings (2026-11-17, on 3.1.0)
 
-Read from each project's PyPI metadata or repository README on that date. "No" means the page
-does not show it.
+Baseline: `uv run pytest` 326 passed, 28 skipped (smoke); ruff and strict mypy clean. The code is
+small (2,600 lines), layered, and well tested. The findings below were reproduced on `main`.
 
-| Project | Kind | Agent guidance in generated projects | Agent tooling | Other notable features |
-| --- | --- | --- | --- | --- |
-| pytemplate-uv 3.0 | PyPI CLI, Copier | `CLAUDE.md` only | Claude Code skill; `--json` on every command | Components with resolution, template packs with pins, 26 combinations checked in CI |
-| [pjkm](https://pypi.org/project/pjkm/) 0.1.1 | PyPI CLI | No | The generator is an MCP server | 105 groups, 22 recipes, a LangGraph agent recipe |
-| [dev-ready](https://pypi.org/project/dev-ready/) 0.13.0 | PyPI CLI | `AGENTS.md`, skills in `.agents/skills/`, links for each agent | Its own skill; MCP config | One FastAPI and React base fetched from GitHub at render time |
-| [agent-scaffold-cli](https://pypi.org/project/agent-scaffold-cli/) 0.4 | PyPI CLI | No | Asks a model to write the project; needs an API key | Agent projects for several frameworks |
-| [agentic-devkit](https://pypi.org/project/agentic-devkit/) 0.1.16 | PyPI CLI | `AGENTS.md` as a router to layered documents | Adapters for Cursor, Claude, and Copilot | Overlay onto an existing repository |
-| [simple-modern-uv](https://github.com/jlevy/simple-modern-uv) | Copier template | `AGENTS.md`, and a `CLAUDE.md` that imports it | Skill in the Agent Skills format for several agents | 14-day dependency cooldown, SHA-pinned Actions |
-| [python-copier-template](https://github.com/mjun0812/python-copier-template) | Copier template | `AGENTS.md` and `CLAUDE.md` | `.claude/settings.json` permissions, a format hook, Codex hooks | Devcontainer with the agents installed |
-| [python-production-template](https://github.com/oedokumaci/python-production-template) | Copier template | `CLAUDE.md`, Cursor rules | Project skills: commit, release, review, docs | ty, taskipy, docs site |
-| [uv-forge](https://uv-forge.readthedocs.io/en/latest/overview.html) | Copier template | No | No | zizmor, Sigstore signing, SLSA provenance, 100% coverage |
-| [cookiecutter-uv](https://github.com/osprey-oss/cookiecutter-uv) | Cookiecutter template | No | No | Docs site, devcontainer, tox-uv, PyPI publishing |
-| [PyScaffold](https://pypi.org/project/pyscaffold/) 4.6 (2024) | PyPI CLI | No | No | Extensions; pip and tox based |
+### Command-line experience
 
-What pytemplate-uv already does better: no other project here resolves components against
-manifests, checks every combination in CI, pins external templates to a digest, or renders
-without the network, a model, or code execution.
+| # | Finding | Evidence |
+| --- | --- | --- |
+| U1 | `create` without `--no-input` fails outside a terminal, after doing the work, with Copier's own advice (`--defaults`, `--data-file`), which are not pytemplate options. It exits 2 (render failure), although nothing about the request was wrong. | `pytemplate create demo </dev/null` |
+| U2 | There is no short flag for the most common option. Every README example, the skill, and CI spell out `--no-input`. The community convention (uv, npm, pip, apt, `uv init`) is `-y`/`--yes`. | README lines 98-245 |
+| U3 | Errors go to stdout, not stderr, and Rich wraps them at 80 columns, which breaks log parsing and `2>` redirection. | `create Bad_Name ... 2>/dev/null` still prints the error |
+| U4 | Unknown identifiers give the full list but no suggestion. | `-c datbase` lists nine components instead of "did you mean 'database'?" |
+| U5 | After `create`, the user is not told what to do next, though the profile knows its lifecycle commands. | `create` prints two lines |
+| U6 | Interactive mode prompts for text answers but never for components; you must know `-c` names first. | `questions.yml`: `components` is always passed as data |
+| U7 | `--json` with prompting enabled would interleave prompts with JSON. | `create --json` without `--no-input` |
+| U8 | No shell completion of profile and component identifiers. | Typer supports `autocompletion=` |
+| U9 | A pure library cannot be generated: `cli` is a default component of `python`, and defaults cannot be removed. `library` is already a declared profile kind with no profile. | `python/profile.toml` |
+| U10 | Three executables (`pytemplate`, `pytemplate-uv`, `create-project`). `create-project` is a generic name that can shadow another tool on `PATH`. | `[project.scripts]` |
 
-What it lacks:
+### Code
 
-1. **`AGENTS.md`.** Four competitors write the cross-agent file; pytemplate-uv writes guidance
-   only Claude Code reads by default.
-2. **A project that is itself an agent tool.** Competitors either ask a model to write one or
-   ship a framework recipe. None renders a tested MCP server deterministically.
-3. **A skill for agents other than Claude Code.** `skill install` only knows `.claude/skills`.
-4. **Agent harness settings**: permissions and hooks in generated projects.
-5. **An MCP server for the generator itself.**
-6. **Supply-chain hardening** of generated CI: SHA-pinned Actions and a dependency cooldown.
-7. **Devcontainer and a docs site.**
+| # | Finding | Evidence |
+| --- | --- | --- |
+| C1 | `import pytemplate.main` takes about 400 ms; Copier is half of it, and `--help`, `--version`, `list-*`, `describe-*`, and `schema` never use it. | `python -X importtime` |
+| C2 | `validate` opens the catalog twice (`validate_request`, then `plan`). For a git pack that is two clones. | `main.py` `validate_config` |
+| C3 | `create --dry-run` checks less than `validate`: it skips Copier's answer validators, so a dry run can pass and the real run fail. | `rendering.render` returns before rendering |
+| C4 | `git clone` runs with no timeout and with credential prompts enabled, so a private or mistyped pack URL can hang an unattended run. | `packs._clone` |
+| C5 | `--template-ref` must be a branch or tag (`clone --branch`); a commit hash cannot be used as the ref, though a commit is the strongest pin. | `packs._clone` |
+| C6 | Every command clones a git pack again, even when it is pinned to a commit and a digest, which are immutable. | `open_catalog` |
+| C7 | Request errors have two hierarchies: `RequestError` and five `ValueError` subclasses, so the CLI keeps a tuple and API users must catch six types. | `main._REQUEST_ERRORS`, `api.py` docstring |
+| C8 | Seven commands repeat the same twelve options and the same `_request(...)` call. | `main.py` is 656 lines |
+| C9 | The unsafe-setting check of a pack is a regex over top-level `*.yml` files; it misses flow-style YAML and `!include`d files. Copier's `unsafe=False` remains the real guard, so this is defence in depth only. | `packs._UNSAFE_SETTINGS` |
+| C10 | Small items: `pytemplate/__init__.py` has a stray comment and no `__version__`; `exclude_patterns()` is computed twice per render; the manifest writer checks `is_file()` twice. | |
+
+### Package and community
+
+| # | Finding |
+| --- | --- |
+| P1 | Lower bounds (`rich>=13.7.0`, `typer>=0.12.0`, `copier>=9.4`) are never tested; CI only runs the lock file. |
+| P2 | This repository's own Actions are pinned to tags, not commit SHAs, and nothing scans the workflows (zizmor). |
+| P3 | Releases do not attach PEP 740 attestations; check whether `uv publish` produces them, or use `pypa/gh-action-pypi-publish`, which does by default. |
+| P4 | The README (15 KB) is the only documentation; there is no docs site, no `Documentation` URL, and no badges. |
+| P5 | No `SECURITY.md` for reporting vulnerabilities in the generator, and no issue templates. |
+| P6 | `Development Status :: 4 - Beta` at a third major version with a written compatibility policy. |
 
 ## 2. Decisions
 
-- **3.1 takes gaps 1 to 3.** They are additive, need no new dependency in the generator, and
-  can be proven by the existing composition and smoke tests.
-- **`AGENTS.md` is the one source of guidance.** `CLAUDE.md` becomes a one-line import of it, so
-  the two never drift. This is part of both profiles, not a component: it adds no combination
-  to the test matrix.
-- **`mcp` is a component of the `python` profile.** It adds a stdio server on the official
-  `mcp` SDK (2.x, `MCPServer`), one read-only tool over `core`, a `<package>-mcp` script, a
-  `.mcp.json` that registers the server for agents working in the project, and a test that
-  calls the tool through the server. The `python` profile goes from 2 to 4 combinations (28 in
-  total).
-- **No model calls, ever.** The generator stays deterministic and offline. That rules out the
-  agent-scaffold approach, and it rules out a bundled "LLM application" profile that would have
-  to choose a provider SDK; such a profile belongs in a template pack.
-- **Gap 4 waits.** A permissions file pre-approves commands on the user's behalf, and a hook runs
-  code. Both need a decision on safe defaults and a check against each agent's current
-  settings format before they ship.
-- **Gap 5 waits.** It adds the `mcp` SDK as a generator dependency (an extra at most). The CLI's
-  `--json` output and the skill already cover the same ground.
-- **Gaps 6 and 7 are not agent features.** They are listed in section 5 for a later release.
+- **`-y`/`--yes` replaces `--no-input`.** It becomes the documented spelling everywhere: README,
+  skill, CI, and the hub's generated commands. The compatibility policy (rule 3) requires a
+  deprecation period for CLI options, so `--no-input` keeps working, hidden from `--help`, with
+  a warning on stderr, and is removed in 4.0. The request-file key `no_input` and the API field
+  `RenderRequest.no_input` stay; Quant App Factory uses the API field. If the maintainer wants
+  `--no-input` gone in 3.2, record it as a second exception under rule 3, as 3.1.0 did.
+- **No prompt without a terminal.** When stdin is not a TTY and `--yes` is absent, `create` exits
+  1 before rendering, naming `-y` and `--data KEY=VALUE`. It does not silently accept defaults.
+- **`--json` implies `--yes`.** Machine output never prompts. Agents already pass both.
+- **Determinism is unchanged.** Interactive defaults may read `git config user.name` and
+  `user.email`, because the answers are recorded in `.copier-answers.yml`; the `--yes` path
+  never reads the environment.
+- **Running programs after rendering is opt-in only.** `--git` (initialise a repository and make
+  the first commit) and `--lock` (`uv lock`) are never defaults and never run in `plan`,
+  `validate`, or `--dry-run`.
+- **No model calls and no new runtime dependency without approval.** Items marked `[?]` name the
+  dependency they would add.
 
 ## 3. Steps
 
-### Agent guidance
+### Phase 1: command-line experience (PR 1)
 
-- [x] 1. Both profiles render `AGENTS.md` (the former `CLAUDE.md` content) and a `CLAUDE.md`
-       that imports it. Profile versions go to `4`.
-- [x] 2. Tests: lifecycle commands appear in `AGENTS.md` and the CI workflow; `CLAUDE.md`
-       imports `AGENTS.md`.
+- [ ] 1. `-y`/`--yes` on `create` and `create-project`; `--no-input` hidden and deprecated with
+       a stderr warning. Tests for both spellings and the warning. (U2)
+- [ ] 2. Refuse to prompt without a TTY (exit 1, actionable message); `--json` implies `--yes`.
+       (U1, U7)
+- [ ] 3. Errors and warnings on stderr through one `Console(stderr=True, soft_wrap=True)`; JSON
+       stays on stdout. (U3)
+- [ ] 4. "Did you mean" suggestions with `difflib.get_close_matches` for profiles, components,
+       schemas, and `--data` keys. (U4)
+- [ ] 5. Next steps after `create`: `cd`, then the profile's lifecycle commands. Human output
+       only; JSON already carries `lifecycle_commands`. (U5)
+- [ ] 6. Shell completion of profile and component identifiers from the bundled catalog. (U8)
+- [ ] 7. README, skill (`SKILL.md`), CONTRIBUTING, CI workflow, and CHANGELOG use `-y`.
+       `tests/test_skill.py` still passes.
 
-### MCP server component
+### Phase 2: core and performance (PR 2)
 
-- [x] 3. `components/mcp.toml` and its files in the `python` tree; the `mcp` choice in
-       `questions.yml`; `mcp` added to the reserved package names.
-- [x] 4. Generated `pyproject.toml`, `README.md`, and `AGENTS.md` describe the server when it is
-       selected.
-- [x] 5. Smoke tests for all four `python` combinations.
+- [ ] 8. Import Copier and PyYAML lazily, inside the functions that render; add a test that
+       `import pytemplate.main` does not import `copier`. Target: `--help` under 150 ms. (C1)
+- [ ] 9. One pass for `validate`: `plan()` already validates, so add the target check to it and
+       drop the second catalog open. (C2)
+- [ ] 10. `create --dry-run` runs the same checks as `validate`, answers included. (C3)
+- [ ] 11. Git hardening: `GIT_TERMINAL_PROMPT=0`, a timeout (default 120 s), and an error that
+        names the URL and the cause. (C4)
+- [ ] 12. Accept a full commit hash as `--template-ref` (`git init` + `fetch --depth 1 origin
+        <sha>`). (C5)
+- [ ] 13. One request-error hierarchy: the profile, component, manifest, and configuration errors
+        also subclass `RequestError` (keeping `ValueError` for compatibility). The CLI and API
+        catch one type. (C7)
+- [ ] 14. Shared request options in `main.py` (one options object built once per command),
+        without changing any option name or default. (C8)
+- [ ] 15. Parse pack YAML (with includes) for unsafe settings instead of a regex. (C9)
+- [ ] 16. Small cleanups and `pytemplate.__version__`. (C10)
 
-### Skill
+### Phase 3: package and community (PR 3; workflow edits need approval)
 
-- [x] 6. `skill install --agent agents` writes to `.agents/skills`, the directory Codex and
-       other Agent Skills clients read. `claude` stays the default.
-- [x] 7. `SKILL.md` maps "MCP server" and "tools for an AI agent" to the `mcp` component and
-       points to `AGENTS.md`.
+- [ ] 17. A CI job that runs the unit tests with `uv sync --resolution lowest-direct`, and raise
+        any lower bound that fails. (P1)
+- [?] 18. SHA-pin this repository's Actions, add zizmor to CI, and Dependabot for Actions. (P2;
+        CI edit)
+- [?] 19. PEP 740 attestations on release. (P3; release-workflow edit)
+- [ ] 20. README badges (PyPI version, Python versions, CI, licence), a `Documentation` URL, a
+        `SECURITY.md`, and issue templates for bugs and template requests. (P4, P5)
+- [?] 21. A docs site generated from the existing Markdown (MkDocs Material or Zensical) on
+        GitHub Pages. (P4; dev dependency and a Pages workflow)
+- [?] 22. Classifier `5 - Production/Stable`. (P6)
+
+### Phase 4: features (one PR each)
+
+- [ ] 23. `library` profile: a package with tests and tooling but no CLI, `kind = "library"`. One
+        combination per optional component. (U9)
+- [?] 24. Interactive component picker when `create` runs in a terminal with no `-c`: a
+        multi-select of the profile's optional components, with `requires` added and
+        `conflicts` refused as now. Needs `questionary` as a direct dependency (Copier already
+        installs it). (U6)
+- [ ] 25. `pytemplate status [PATH]`: read `.pytemplate.toml` and list generated files that were
+        changed, deleted, or added since generation. Read-only; it never merges or rewrites, so
+        it does not reopen the 3.1.0 decision on `update`.
+- [ ] 26. Opt-in `--git` and `--lock` on `create`.
+- [ ] 27. `release` component for `python` and `library`: a trusted-publishing release
+        workflow with a tag-equals-version check, like this repository's own.
+- [ ] 28. `devcontainer` component (already a 3.1 candidate).
+- [?] 29. SHA-pinned Actions and a dependency cooldown (`exclude-newer`) in generated CI. Needs
+        a way to keep the pins current, since `update` is gone: Dependabot config in the
+        generated project is the likely answer.
+- [?] 30. Deprecate the `create-project` executable in favour of `pytemplate create` and
+        `uvx pytemplate-uv create`; remove it in 4.0. (U10)
+- [?] 31. Cache git packs pinned to a commit and a digest, keyed by both, under the user cache
+        directory; `--no-cache` to bypass. Needs `platformdirs` or a small cache-path
+        function. (C6)
 
 ### Release
 
-- [x] 8. README, `AGENTS.md`, and the CHANGELOG.
-- [x] 9. Version 3.1.0 and `uv.lock`. The release also carries the removal of
-       `pytemplate update` (PR #9); [docs/compatibility.md](docs/compatibility.md) rule 3 records
-       it as an exception to the deprecation rule.
-- [ ] 10. Maintainer only: confirm CI is green on all runners, then tag `v3.1.0`.
+- [ ] 32. CHANGELOG, version 3.2.0, `uv.lock`, and the hub's commands updated to `-y` after
+        release.
+- [ ] 33. Maintainer only: confirm CI is green on all runners, then tag `v3.2.0`.
 
 ## 4. Acceptance criteria
 
-- Every generated project has an `AGENTS.md` naming its lifecycle commands, and a `CLAUDE.md`
-  that imports it.
-- `pytemplate create NAME -p python -c mcp` renders a project whose lint, format, strict
-  type-check, and tests pass, and whose test calls the tool through the server.
-- Without `mcp`, no MCP file or dependency is rendered.
-- `skill install --agent agents --project` writes `./.agents/skills/pytemplate/SKILL.md`.
-- The generator has no new dependency.
+- `pytemplate create demo -y` and `pytemplate create demo --no-input` produce byte-identical
+  projects; the second prints one deprecation warning on stderr.
+- `pytemplate create demo </dev/null` exits 1 before rendering and names `-y`.
+- No error text appears on stdout outside `--json`.
+- `pytemplate --help` imports no Copier module.
+- `pytemplate validate --template <git pack>` clones once.
+- Every existing request file, JSON field, exit code, and question works unchanged.
+- The 28 generated combinations still pass their lifecycle commands, plus the new `library`
+  combinations.
 
-## 5. Later candidates
+## 5. Not planned
 
-| Candidate | Needs first |
+| Idea | Why not |
 | --- | --- |
-| `mcp` for the `fastapi` profile (streamable HTTP mounted on the service, behind the auth components) | A decision on how tool calls map to scopes |
-| Agent settings component: a deny rule for secret files, pre-approved lifecycle commands, a format hook | Safe defaults; a test against each agent's settings format |
-| Project skills in generated projects (release, review) | Evidence they help; a rule against scripts in skills |
-| `pytemplate mcp`: the generator as an MCP server | Approval of an optional `mcp` dependency |
-| SHA-pinned Actions and a dependency cooldown in generated CI | A way to keep pins current without `update` |
-| Devcontainer component | Nothing; one more combination per profile |
-
-## 6. Verification (2026-11-11, macOS, CPython 3.11 generator)
-
-| Check | Command | Result |
-| --- | --- | --- |
-| Unit, contract, composition, and pack tests | `uv run pytest` | 326 passed, 28 skipped (smoke) |
-| Lint, format, and types | `uv run ruff check .`, `uv run ruff format --check pytemplate tests`, `uv run mypy` | clean |
-| Generated combinations | `PYTEMPLATE_SMOKE=1 uv run pytest tests/test_generated_projects.py`, by profile | 28 passed: 4 `python`, 24 `fastapi` |
-| `python` combinations on the newest target | the same, with `PYTEMPLATE_SMOKE_PYTHON=3.15` | 4 passed |
-| The generated server answers a client | `initialize` and `tools/call greet` piped to `uv run demo-tool-mcp` | returned `Greetings, esteemed Ada.` as text and structured content |
-| Distribution | `uv build`, `uvx twine check --strict dist/*` | PASSED |
-
-Not verified locally: the Windows and Linux CI runners, and `fastapi` combinations with
-`python_version=3.15`.
+| A bundled LLM-application profile | It must choose a provider SDK; it belongs in a template pack. |
+| Prompting or generating with a model | The generator stays deterministic and offline. |
+| Bringing back `update` | Merging a template release into a changed project was not safe (3.1.0). `status` reports drift without changing files. |
+| `pytemplate mcp` | Still waits for approval of an optional `mcp` dependency; `--json` and the skill cover it. |
