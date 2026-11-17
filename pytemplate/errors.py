@@ -8,7 +8,11 @@ class RenderError(RuntimeError):
 
 
 class RequestError(RenderError):
-    """Raised when a render request is invalid and nothing was written (CLI exit code 1)."""
+    """Raised when a render request is invalid and nothing was written (CLI exit code 1).
+
+    Also the base of the configuration, manifest, profile, and component errors, which keep
+    ``ValueError`` as a second base for compatibility.
+    """
 
 
 class PackError(RequestError):

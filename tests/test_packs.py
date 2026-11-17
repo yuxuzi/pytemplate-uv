@@ -11,6 +11,7 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
+from pytemplate import packs
 from pytemplate.configuration import load_render_request
 from pytemplate.errors import PackError, RenderError
 from pytemplate.main import app
@@ -426,3 +427,222 @@ def test_request_file_carries_the_pin(pack: Path, tmp_path: Path) -> None:
 
     assert request.template_commit == "a" * 40
     assert request.template_digest == "b" * 64
+
+
+def test_git_runs_without_prompts_and_with_a_timeout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: list[dict[str, object]] = []
+
+    def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        seen.append(kwargs)
+        raise subprocess.TimeoutExpired(command, 5)
+
+    monkeypatch.setattr(packs.subprocess, "run", fake_run)
+    monkeypatch.setenv("PYTEMPLATE_GIT_TIMEOUT", "5")
+
+    with pytest.raises(PackError, match=r"https://example.invalid/pack.git.*within 5 s"):
+        packs._clone("https://example.invalid/pack.git", None, tmp_path / "pack")
+
+    env = seen[0]["env"]
+    assert isinstance(env, dict)
+    assert env["GIT_TERMINAL_PROMPT"] == "0"
+    assert env["GCM_INTERACTIVE"] == "never"
+    assert seen[0]["timeout"] == 5.0
+
+
+@pytest.mark.parametrize("value", ["0", "-3", "soon"])
+def test_a_bad_git_timeout_is_a_pack_error(value: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PYTEMPLATE_GIT_TIMEOUT", value)
+
+    with pytest.raises(PackError, match="PYTEMPLATE_GIT_TIMEOUT"):
+        packs._git_timeout()
+
+
+def test_the_git_timeout_defaults_to_two_minutes(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("PYTEMPLATE_GIT_TIMEOUT", raising=False)
+
+    assert packs._git_timeout() == 120.0
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is required")
+def test_a_full_commit_hash_is_accepted_as_the_ref(pack: Path, tmp_path: Path) -> None:
+    first = _tagged_pack(pack)
+    (pack / "NOTES.md").write_text("later\n", encoding="utf-8")
+    _commit_and_tag(pack, "v2.0.0")
+    _git(pack, "config", "uploadpack.allowAnySHA1InWant", "true")
+
+    with open_catalog(pack.as_uri(), first) as (_, source, root):
+        assert source.commit == first
+        assert source.ref == first
+        assert not (root / "NOTES.md").exists()
+        assert not (root / ".git").exists()
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is required")
+def test_an_unknown_commit_hash_is_a_pack_error(pack: Path, tmp_path: Path) -> None:
+    _tagged_pack(pack)
+    _git(pack, "config", "uploadpack.allowAnySHA1InWant", "true")
+
+    with pytest.raises(PackError, match="Could not fetch template pack"):
+        with open_catalog(pack.as_uri(), "0" * 40):
+            pass
+
+
+@pytest.mark.parametrize(
+    "setting",
+    [
+        "{_tasks: [echo hi], _other: 1}",
+        "{_migrations: []}",
+        "{_jinja_extensions: [x.Ext]}",
+        "{_external_data: {x: y.yml}}",
+        "_external_data:\n  x: y.yml",
+        '"_tasks": [echo hi]',
+    ],
+)
+def test_flow_style_and_other_spellings_of_unsafe_settings_are_rejected(
+    pack: Path, tmp_path: Path, setting: str
+) -> None:
+    (pack / "extra.yaml").write_text(setting + "\n", encoding="utf-8")
+
+    with pytest.raises(PackError, match="declares '_"):
+        render(_request(pack, tmp_path))
+
+
+def test_an_unsafe_setting_in_an_included_file_is_rejected(pack: Path, tmp_path: Path) -> None:
+    nested = pack / "parts"
+    nested.mkdir()
+    (nested / "more.yml").write_text("--- !include deeper.yml\n", encoding="utf-8")
+    (nested / "deeper.yml").write_text("_tasks: [echo hi]\n", encoding="utf-8")
+    copier_yml = pack / "copier.yml"
+    copier_yml.write_text(
+        copier_yml.read_text(encoding="utf-8") + "\n--- !include parts/more.yml\n", "utf-8"
+    )
+
+    with pytest.raises(PackError, match=r"deeper.yml declares '_tasks'"):
+        render(_request(pack, tmp_path))
+
+
+def test_an_include_outside_the_pack_is_rejected(pack: Path, tmp_path: Path) -> None:
+    (tmp_path / "outside.yml").write_text("a: 1\n", encoding="utf-8")
+    copier_yml = pack / "copier.yml"
+    copier_yml.write_text(
+        copier_yml.read_text(encoding="utf-8") + "\n--- !include ../outside.yml\n", "utf-8"
+    )
+
+    with pytest.raises(PackError, match="outside the pack"):
+        render(_request(pack, tmp_path))
+
+
+def test_unknown_yaml_tags_and_broken_yaml_are_rejected(pack: Path, tmp_path: Path) -> None:
+    (pack / "extra.yml").write_text("a: !!python/object/apply:os.getcwd []\n", encoding="utf-8")
+    with pytest.raises(PackError, match="YAML tag"):
+        render(_request(pack, tmp_path))
+
+    (pack / "extra.yml").write_text("a: [unclosed\n", encoding="utf-8")
+    with pytest.raises(PackError, match="not valid YAML"):
+        render(_request(pack, tmp_path))
+
+
+@pytest.fixture(autouse=True)
+def _isolated_cache(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> Path:
+    """Keep every test away from the real user cache."""
+    cache = tmp_path_factory.mktemp("cache")
+    monkeypatch.setenv("PYTEMPLATE_CACHE_DIR", str(cache))
+    monkeypatch.delenv("PYTEMPLATE_NO_CACHE", raising=False)
+    return cache
+
+
+def _full_pin(pack: Path, tmp_path: Path) -> dict[str, str]:
+    commit = _tagged_pack(pack)
+    digest = plan(_pinned(pack, tmp_path)).source.digest
+    assert digest is not None
+    return {"template_commit": commit, "template_digest": digest}
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is required")
+def test_a_pack_pinned_to_commit_and_digest_is_cached(
+    pack: Path, tmp_path: Path, _isolated_cache: Path
+) -> None:
+    pins = _full_pin(pack, tmp_path)
+    assert not (_isolated_cache / "packs").exists()
+
+    render(_pinned(pack, tmp_path, **pins))
+
+    entry = _isolated_cache / "packs" / f"{pins['template_commit']}-{pins['template_digest']}"
+    assert (entry / "pytemplate-pack.toml").is_file()
+    assert not (entry / ".git").exists()
+    assert [item.name for item in (_isolated_cache / "packs").iterdir()] == [entry.name]
+
+    # The repository can disappear: the second run comes from the cache.
+    packs._remove_tree(pack / ".git")
+    result = render(_pinned(pack, tmp_path, overwrite=True, **pins))
+    assert result.source.commit == pins["template_commit"]
+    assert result.source.digest == pins["template_digest"]
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is required")
+def test_a_changed_cache_entry_is_discarded_and_fetched_again(
+    pack: Path, tmp_path: Path, _isolated_cache: Path
+) -> None:
+    pins = _full_pin(pack, tmp_path)
+    render(_pinned(pack, tmp_path, **pins))
+    entry = _isolated_cache / "packs" / f"{pins['template_commit']}-{pins['template_digest']}"
+    (entry / "tool" / "template" / "README.md.jinja").write_text("tampered\n", encoding="utf-8")
+
+    result = render(_pinned(pack, tmp_path, overwrite=True, **pins))
+
+    assert pack_digest(entry) == pins["template_digest"]
+    assert result.source.digest == pins["template_digest"]
+    assert "tampered" not in (result.project_path / "README.md").read_text(encoding="utf-8")
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is required")
+def test_pack_cache_is_skipped_when_not_fully_pinned_or_disabled(
+    pack: Path, tmp_path: Path, _isolated_cache: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pins = _full_pin(pack, tmp_path)
+
+    render(_pinned(pack, tmp_path, template_commit=pins["template_commit"]))
+    render(_pinned(pack, tmp_path, overwrite=True, template_digest=pins["template_digest"]))
+    render(_pinned(pack, tmp_path, overwrite=True, use_cache=False, **pins))
+    monkeypatch.setenv("PYTEMPLATE_NO_CACHE", "1")
+    render(_pinned(pack, tmp_path, overwrite=True, **pins))
+
+    assert not (_isolated_cache / "packs").exists()
+
+
+@pytest.mark.parametrize(
+    ("platform", "env", "expected"),
+    [
+        ("darwin", {}, ("Library", "Caches", "pytemplate-uv")),
+        ("linux", {}, (".cache", "pytemplate-uv")),
+        ("linux", {"XDG_CACHE_HOME": "XDG"}, ("XDG", "pytemplate-uv")),
+        ("win32", {"LOCALAPPDATA": "LOCAL"}, ("LOCAL", "pytemplate-uv", "Cache")),
+    ],
+)
+def test_cache_dir_follows_the_platform(
+    platform: str,
+    env: dict[str, str],
+    expected: tuple[str, ...],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("PYTEMPLATE_CACHE_DIR")
+    for name in ("XDG_CACHE_HOME", "LOCALAPPDATA"):
+        monkeypatch.delenv(name, raising=False)
+    for name, value in env.items():
+        monkeypatch.setenv(name, str(tmp_path / value))
+    monkeypatch.setattr(packs.sys, "platform", platform)
+    monkeypatch.setattr(packs.Path, "home", lambda: tmp_path / "home")
+    base = tmp_path if env else tmp_path / "home"
+
+    assert packs.cache_dir() == base.joinpath(*expected)
+
+
+def test_cache_dir_can_be_overridden(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PYTEMPLATE_CACHE_DIR", str(tmp_path / "mine"))
+
+    assert packs.cache_dir() == tmp_path / "mine"

@@ -11,7 +11,7 @@ import subprocess
 import sys
 import tempfile
 import tomllib
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from importlib import resources
@@ -29,8 +29,8 @@ from pytemplate.profiles import (
 
 PACK_FILE = "pytemplate-pack.toml"
 BUNDLED = "bundled"
-# Copier settings that run code or load extensions; packs must never declare them.
-_UNSAFE_SETTINGS = re.compile(r"^(_tasks|_migrations|_jinja_extensions)\s*:", re.MULTILINE)
+# Copier settings that run code, load extensions, or fetch data; packs must never declare them.
+_UNSAFE_SETTINGS = ("_tasks", "_migrations", "_jinja_extensions", "_external_data")
 _GIT_PREFIXES = ("gh:", "gl:", "git+", "https://", "http://", "ssh://", "git@", "file://")
 _PACK_KEYS = frozenset({"contract", "id", "name", "description", "version"})
 _COMMIT = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
@@ -67,35 +67,92 @@ def _clone_url(location: str) -> str:
     return location.removeprefix("git+")
 
 
+DEFAULT_GIT_TIMEOUT = 120.0
+_GIT_TIMEOUT_ENV = "PYTEMPLATE_GIT_TIMEOUT"
+
+
+def _git_timeout() -> float:
+    """Return the seconds a git command may run, from ``PYTEMPLATE_GIT_TIMEOUT`` or 120."""
+    raw = os.environ.get(_GIT_TIMEOUT_ENV)
+    if raw is None or not raw.strip():
+        return DEFAULT_GIT_TIMEOUT
+    try:
+        seconds = float(raw)
+    except ValueError:
+        seconds = 0.0
+    if seconds <= 0:
+        raise PackError(f"{_GIT_TIMEOUT_ENV} must be a positive number of seconds, got '{raw}'.")
+    return seconds
+
+
+def _git_environment() -> dict[str, str]:
+    """Return an environment in which git never waits for a person to type a credential."""
+    return {**os.environ, "GIT_TERMINAL_PROMPT": "0", "GCM_INTERACTIVE": "never"}
+
+
+def _run_git(
+    git: str, args: Sequence[str], *, location: str, cwd: Path | None = None
+) -> subprocess.CompletedProcess[str]:
+    """Run git without prompts and with a timeout; a timeout is a ``PackError``."""
+    timeout = _git_timeout()
+    try:
+        return subprocess.run(
+            [git, "-c", "core.autocrlf=false", *args],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=False,
+            env=_git_environment(),
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise PackError(
+            f"Template pack '{location}': git {args[0]} did not finish within {timeout:g} s and "
+            f"was stopped. Check the URL and your network, or raise {_GIT_TIMEOUT_ENV}."
+        ) from error
+
+
+def _fetch_commit(git: str, url: str, commit: str, destination: Path, location: str) -> None:
+    """Fetch exactly ``commit`` (a full hash) into ``destination`` and check it out."""
+    destination.mkdir(parents=True)
+    for args in (
+        ["init", "--quiet"],
+        ["fetch", "--quiet", "--depth", "1", url, commit],
+        ["checkout", "--quiet", "FETCH_HEAD"],
+    ):
+        completed = _run_git(git, args, location=location, cwd=destination)
+        if completed.returncode != 0:
+            raise PackError(
+                f"Could not fetch template pack '{location}' at commit {commit}: "
+                f"{completed.stderr.strip()}"
+            )
+
+
 def _clone(location: str, ref: str | None, destination: Path) -> str:
     """Clone ``location`` at ``ref`` into a plain checkout and return its commit.
 
-    Line endings are not converted, so a pack has the same bytes and digest on every machine.
+    ``ref`` is a branch, a tag, or a full commit hash. Line endings are not converted, so a pack
+    has the same bytes and digest on every machine.
     """
     git = shutil.which("git")
     if git is None:
         raise PackError(f"git is required to use the template pack '{location}'; install git.")
-    command = [git, "-c", "core.autocrlf=false", "clone", "--quiet", "--depth", "1"]
-    if ref:
-        command += ["--branch", ref]
     url = _clone_url(location)
     if Path(url).is_dir():
         url = Path(url).resolve().as_uri()
-    completed = subprocess.run(
-        [*command, url, str(destination)], capture_output=True, text=True, check=False
-    )
-    if completed.returncode != 0:
-        raise PackError(
-            f"Could not clone template pack '{location}'"
-            f"{f' at {ref}' if ref else ''}: {completed.stderr.strip()}"
-        )
-    commit = subprocess.run(
-        [git, "rev-parse", "HEAD"],
-        cwd=destination,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    if ref and _COMMIT.match(ref):
+        _fetch_commit(git, url, ref, destination, location)
+    else:
+        command = ["clone", "--quiet", "--depth", "1"]
+        if ref:
+            command += ["--branch", ref]
+        completed = _run_git(git, [*command, url, str(destination)], location=location)
+        if completed.returncode != 0:
+            raise PackError(
+                f"Could not clone template pack '{location}'"
+                f"{f' at {ref}' if ref else ''}: {completed.stderr.strip()}"
+            )
+    commit = _run_git(git, ["rev-parse", "HEAD"], location=location, cwd=destination)
     if commit.returncode != 0:
         raise PackError(f"Could not read the commit of '{location}': {commit.stderr.strip()}")
     # Render from a plain checkout; the source, ref, and commit are recorded separately.
@@ -148,6 +205,77 @@ def _check_pin(
         raise PackError(f"Template digest must be a lowercase SHA-256 hash, got '{digest}'.")
 
 
+def _yaml_documents(path: Path) -> tuple[list[Any], list[str]]:
+    """Parse every document of a pack YAML file and list the files it ``!include``s.
+
+    Copier's ``!include`` tag is tolerated and not followed here; any other tag is refused.
+    """
+    import yaml
+
+    includes: list[str] = []
+
+    class Loader(yaml.SafeLoader):
+        """A safe loader that records Copier's ``!include`` tag instead of resolving it."""
+
+    def include(loader: yaml.SafeLoader, node: yaml.Node) -> None:
+        if isinstance(node, yaml.ScalarNode):
+            includes.append(str(node.value))
+        elif isinstance(node, yaml.SequenceNode):
+            includes.extend(str(loader.construct_object(item)) for item in node.value)
+
+    def refuse(loader: yaml.SafeLoader, suffix: str, node: yaml.Node) -> None:
+        raise PackError(f"Template pack file {path.name} uses the YAML tag '{node.tag}'.")
+
+    Loader.add_constructor("!include", include)
+    Loader.add_multi_constructor("", refuse)
+    try:
+        documents = list(yaml.load_all(path.read_text(encoding="utf-8"), Loader=Loader))
+    except (yaml.YAMLError, UnicodeDecodeError) as error:
+        raise PackError(f"Template pack file {path.name} is not valid YAML: {error}") from error
+    return documents, includes
+
+
+def _included_files(root: Path, config: Path, names: Sequence[str]) -> list[Path]:
+    """Return the files ``config`` includes, which must stay inside the pack."""
+    found: list[Path] = []
+    for name in names:
+        if "{{" in name or "{%" in name:
+            raise PackError(
+                f"Template pack file {config.name} includes '{name}', which cannot be checked; "
+                "name the included file without a template expression."
+            )
+        for candidate in sorted(config.parent.glob(name)):
+            resolved = candidate.resolve()
+            if root.resolve() not in resolved.parents:
+                raise PackError(
+                    f"Template pack file {config.name} includes '{name}', outside the pack."
+                )
+            if resolved.is_file():
+                found.append(resolved)
+    return found
+
+
+def _check_settings(root: Path) -> None:
+    """Reject a pack whose Copier configuration declares a setting that runs code."""
+    pending = [*root.glob("*.yml"), *root.glob("*.yaml")]
+    seen: set[Path] = set()
+    while pending:
+        config = pending.pop().resolve()
+        if config in seen or not config.is_file():
+            continue
+        seen.add(config)
+        documents, includes = _yaml_documents(config)
+        for document in documents:
+            if isinstance(document, dict):
+                for setting in _UNSAFE_SETTINGS:
+                    if setting in document:
+                        raise PackError(
+                            f"Template pack file {config.name} declares '{setting}', which "
+                            "pytemplate never runs; remove it from the pack."
+                        )
+        pending.extend(_included_files(root, config, includes))
+
+
 def _check_safe(root: Path) -> None:
     """Reject symlinks (Copier would copy their targets) and code-running Copier settings."""
     for path in root.rglob("*"):
@@ -155,13 +283,7 @@ def _check_safe(root: Path) -> None:
             raise PackError(
                 f"Template pack contains a symlink, which is not allowed: {path.relative_to(root)}"
             )
-    for config in [*root.glob("*.yml"), *root.glob("*.yaml")]:
-        match = _UNSAFE_SETTINGS.search(config.read_text(encoding="utf-8"))
-        if match:
-            raise PackError(
-                f"Template pack file {config.name} declares '{match.group(1)}', which "
-                "pytemplate never runs; remove it from the pack."
-            )
+    _check_settings(root)
 
 
 def _read_pack(root: Path) -> tuple[str, str]:
@@ -187,6 +309,75 @@ def _read_pack(root: Path) -> tuple[str, str]:
     return str(data["id"]), str(data["version"])
 
 
+def cache_dir() -> Path:
+    """Return the directory for cached template packs.
+
+    ``PYTEMPLATE_CACHE_DIR`` wins; otherwise the user cache directory of the platform.
+    """
+    override = os.environ.get("PYTEMPLATE_CACHE_DIR")
+    if override:
+        return Path(override).expanduser()
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Caches" / "pytemplate-uv"
+    if sys.platform == "win32":
+        base = os.environ.get("LOCALAPPDATA")
+        return (
+            (Path(base) if base else Path.home() / "AppData" / "Local") / "pytemplate-uv" / "Cache"
+        )
+    base = os.environ.get("XDG_CACHE_HOME")
+    return (Path(base) if base else Path.home() / ".cache") / "pytemplate-uv"
+
+
+def _cache_enabled(use_cache: bool) -> bool:
+    disabled = os.environ.get("PYTEMPLATE_NO_CACHE", "").strip().lower()
+    return use_cache and disabled in ("", "0", "false", "no")
+
+
+def _check_fetched(
+    template: str, ref: str | None, fetched: str, contents: str, commit: str, digest: str
+) -> None:
+    if fetched != commit:
+        raise PackError(
+            f"Template pack '{template}' at {ref} is commit {fetched}, not the pinned "
+            f"{commit}. The tag may have moved; nothing was rendered."
+        )
+    if contents != digest:
+        raise PackError(
+            f"Template pack '{template}' at {ref} has digest {contents}, not the pinned "
+            f"{digest}. Nothing was rendered."
+        )
+
+
+def _cached_pack(template: str, ref: str | None, commit: str, digest: str) -> Path:
+    """Return a verified local copy of a pack pinned to ``commit`` and ``digest``.
+
+    The copy lives in the cache, keyed by both pins. It is verified against the digest on every
+    use; a copy that no longer matches is discarded and fetched again. A new copy is written
+    beside its final place and moved in with one rename, so a reader never sees half of one.
+    """
+    packs_dir = cache_dir() / "packs"
+    target = packs_dir / f"{commit}-{digest}"
+    if target.is_dir():
+        if pack_digest(target) == digest:
+            return target
+        _remove_tree(target)
+    packs_dir.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=".fetch-", dir=packs_dir))
+    try:
+        fetched = _clone(template, ref, staging / "pack")
+        contents = pack_digest(staging / "pack")
+        _check_fetched(template, ref, fetched, contents, commit, digest)
+        try:
+            os.replace(staging / "pack", target)
+        except OSError:
+            # Another process stored the same pack first.
+            if not (target.is_dir() and pack_digest(target) == digest):
+                raise
+    finally:
+        _remove_tree(staging)
+    return target
+
+
 @contextmanager
 def open_catalog(
     template: str | None = None,
@@ -195,6 +386,7 @@ def open_catalog(
     bundled_location: str = "",
     commit: str | None = None,
     digest: str | None = None,
+    use_cache: bool = True,
 ) -> Iterator[tuple[Catalog, TemplateSource, Path]]:
     """Yield the catalog, its recorded source, and a local Copier template directory.
 
@@ -204,6 +396,10 @@ def open_catalog(
 
     ``commit`` and ``digest`` pin a git source: the pack is refused, before any of it is read, if
     ``ref`` no longer resolves to that commit or its files no longer match that digest.
+
+    A git source pinned to both a commit and a digest is immutable, so it is cached under the
+    user cache directory and verified on each use. ``use_cache=False`` or the environment
+    variable ``PYTEMPLATE_NO_CACHE=1`` fetches it every time instead.
     """
     _check_pin(template, ref, commit, digest)
     if template is None:
@@ -215,13 +411,22 @@ def open_catalog(
     with tempfile.TemporaryDirectory(prefix="pytemplate-pack-") as scratch:
         fetched: str | None = None
         if is_git_source(template) or ref:
-            root = Path(scratch) / "pack"
-            fetched = _clone(template, ref, root)
-            if commit is not None and fetched != commit:
-                raise PackError(
-                    f"Template pack '{template}' at {ref} is commit {fetched}, not the pinned "
-                    f"{commit}. The tag may have moved; nothing was rendered."
-                )
+            if (
+                commit is not None
+                and digest is not None
+                and is_git_source(template)
+                and _cache_enabled(use_cache)
+            ):
+                root = _cached_pack(template, ref, commit, digest)
+                fetched = commit
+            else:
+                root = Path(scratch) / "pack"
+                fetched = _clone(template, ref, root)
+                if commit is not None and fetched != commit:
+                    raise PackError(
+                        f"Template pack '{template}' at {ref} is commit {fetched}, not the "
+                        f"pinned {commit}. The tag may have moved; nothing was rendered."
+                    )
             location = template
         else:
             root = Path(template).expanduser().resolve()

@@ -15,10 +15,7 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-
-import yaml
-from copier import Settings, run_copy
-from copier.errors import CopierError
+from typing import Any
 
 from pytemplate.errors import RenderError, RequestError
 from pytemplate.packs import TemplateSource, open_catalog
@@ -84,7 +81,8 @@ class RenderRequest:
 
     ``template`` selects an external template pack (a directory or git source) and
     ``template_ref`` a git tag or branch of it; leave both unset for the bundled templates.
-    ``template_commit`` and ``template_digest`` refuse a git pack that no longer matches them.
+    ``template_commit`` and ``template_digest`` refuse a git pack that no longer matches them; a
+    pack pinned to both is cached unless ``use_cache`` is false.
     """
 
     profile_id: str
@@ -99,6 +97,7 @@ class RenderRequest:
     template_ref: str | None = None
     template_commit: str | None = None
     template_digest: str | None = None
+    use_cache: bool = True
 
 
 def _open_request_catalog(
@@ -109,6 +108,7 @@ def _open_request_catalog(
         request.template_ref,
         commit=request.template_commit,
         digest=request.template_digest,
+        use_cache=request.use_cache,
     )
 
 
@@ -251,6 +251,8 @@ def _recorded_answers(project_path: Path) -> dict[str, object]:
     answers_path = project_path / ANSWERS_FILE
     if not answers_path.is_file():
         return {}
+    import yaml
+
     answers = yaml.safe_load(answers_path.read_text(encoding="utf-8")) or {}
     return {
         str(key): value
@@ -314,7 +316,7 @@ def write_generation_manifest(
         ]
     lines += ["", "[answers]", *(f"{key} = {_toml(value)}" for key, value in answers.items())]
     for path in sorted(files):
-        if path.is_file() and path.name != MANIFEST_FILE:
+        if path.name != MANIFEST_FILE:
             relative = path.relative_to(project_path).as_posix()
             digest = hashlib.sha256(path.read_bytes()).hexdigest()
             lines += [
@@ -330,6 +332,8 @@ def write_generation_manifest(
 
 def _record_template_source(project_path: Path, location: str, ref: str | None) -> None:
     """Record the template's stable source, not Copier's local path, so output is deterministic."""
+    import yaml
+
     answers_path = project_path / ANSWERS_FILE
     answers = yaml.safe_load(answers_path.read_text(encoding="utf-8")) or {}
     answers["_src_path"] = location
@@ -390,6 +394,14 @@ def _publish(staged: Path, project_path: Path) -> None:
     _remove(backup)
 
 
+def run_copy(*args: Any, **kwargs: Any) -> Any:
+    """Run Copier with default settings; imported here because Copier is slow to import."""
+    from copier import Settings
+    from copier import run_copy as copier_run_copy
+
+    return copier_run_copy(*args, settings=Settings(), **kwargs)
+
+
 def _render_into(
     destination: Path,
     request: RenderRequest,
@@ -398,16 +410,18 @@ def _render_into(
     template_path: Path,
 ) -> Path:
     """Render with Copier into ``destination`` and write the answers and manifest files."""
+    from copier.errors import CopierError
+
+    exclusions = resolution.exclude_patterns(_package_name(request))
     try:
         run_copy(
             str(template_path),
             destination,
             data=_context(request, resolution),
-            settings=Settings(),
             defaults=request.no_input,
             quiet=True,
             unsafe=False,
-            exclude=resolution.exclude_patterns(_package_name(request)),
+            exclude=exclusions,
         )
     except ValueError as error:
         raise RequestError(
@@ -424,7 +438,7 @@ def _render_into(
             "`{{ _copier_answers|to_nice_yaml }}` to its template."
         )
     _record_template_source(destination, source.location, source.ref)
-    remove_excluded_directories(destination, resolution.exclude_patterns(_package_name(request)))
+    remove_excluded_directories(destination, exclusions)
     return write_generation_manifest(destination, resolution, source)
 
 
@@ -437,6 +451,23 @@ def _source(request: RenderRequest, opened: TemplateSource) -> TemplateSource:
     return TemplateSource(kind=opened.kind, location=DEFAULT_TEMPLATE_SOURCE, ref=ref)
 
 
+def _trial_render(
+    request: RenderRequest, resolution: Resolution, source: TemplateSource, root: Path
+) -> tuple[str, ...]:
+    """Render into a temporary directory, so every check runs, and return the file list."""
+    with tempfile.TemporaryDirectory(prefix="pytemplate-plan-") as scratch:
+        staged = Path(scratch) / request.project_name
+        try:
+            _render_into(staged, request, resolution, source, root)
+        except OSError as error:
+            raise RenderError(f"Could not render the plan: {error}") from error
+        return tuple(
+            sorted(
+                path.relative_to(staged).as_posix() for path in staged.rglob("*") if path.is_file()
+            )
+        )
+
+
 def plan(request: RenderRequest) -> RenderPlan:
     """Resolve a request and list the files it would generate, without touching the target.
 
@@ -445,19 +476,7 @@ def plan(request: RenderRequest) -> RenderPlan:
     with _open_request_catalog(request) as (catalog, opened, root):
         resolution, project_path = _validate(request, catalog)
         source = _source(request, opened)
-        with tempfile.TemporaryDirectory(prefix="pytemplate-plan-") as scratch:
-            staged = Path(scratch) / request.project_name
-            try:
-                _render_into(staged, request, resolution, source, root)
-            except OSError as error:
-                raise RenderError(f"Could not render the plan: {error}") from error
-            files = tuple(
-                sorted(
-                    path.relative_to(staged).as_posix()
-                    for path in staged.rglob("*")
-                    if path.is_file()
-                )
-            )
+        files = _trial_render(request, resolution, source, root)
     return RenderPlan(
         resolution=resolution,
         project_path=project_path,
@@ -475,6 +494,8 @@ def render(request: RenderRequest) -> RenderResult:
         _check_target(request, project_path)
         source = _source(request, opened)
         if request.dry_run:
+            # Same checks as `plan`, Copier's answer validators included; nothing is written.
+            _trial_render(request, resolution, source, root)
             return RenderResult(
                 resolution=resolution, project_path=project_path, dry_run=True, source=source
             )

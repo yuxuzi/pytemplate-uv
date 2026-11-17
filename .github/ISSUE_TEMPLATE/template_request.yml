@@ -1,0 +1,32 @@
+name: Template or component request
+description: Propose a new profile, component, or change to a bundled one.
+labels: [enhancement]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What do you want added or changed?
+      options:
+        - A new component
+        - A new profile
+        - A change to a bundled component or profile
+        - A change to template pack support
+    validations:
+      required: true
+  - type: textarea
+    id: need
+    attributes:
+      label: What would a generated project do with it?
+      description: Describe the capability and who needs it.
+    validations:
+      required: true
+  - type: textarea
+    id: shape
+    attributes:
+      label: Proposed shape
+      description: Files, dependencies, and commands you expect, and how you would check them.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Could a template pack provide this instead?

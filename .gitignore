@@ -82,3 +82,7 @@ logs/
 
 # Planning documents (development-only, not shipped)
 docs/plans/
+
+# Documentation site build output
+site/
+site-src/
