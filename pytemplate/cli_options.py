@@ -13,6 +13,7 @@ from typing import Annotated
 import typer
 
 from pytemplate.configuration import ConfigurationError
+from pytemplate.profiles import bundled_catalog
 from pytemplate.rendering import RenderRequest
 
 JsonOption = Annotated[bool, typer.Option("--json", help="Print machine-readable JSON.")]
@@ -42,7 +43,38 @@ TemplateDigestOption = Annotated[
         help="Refuse the git pack unless its files match this SHA-256 digest",
     ),
 ]
-ProfileOption = Annotated[str, typer.Option("--profile", "-p", help="Profile identifier")]
+
+
+def _bundled_choices(ctx: typer.Context, kind: str, incomplete: str) -> list[tuple[str, str]]:
+    """Complete identifiers from the bundled catalog; never fail, and skip a --template pack."""
+    if ctx.params.get("template"):
+        return []
+    try:
+        catalog = bundled_catalog()
+        items = (
+            [(p.identifier, p.description) for p in catalog.profiles]
+            if kind == "profile"
+            else [(c.identifier, c.description) for c in catalog.components]
+        )
+    except Exception:  # completion must never print a traceback into the user's shell
+        return []
+    return [(name, text) for name, text in items if name.startswith(incomplete)]
+
+
+def complete_profiles(ctx: typer.Context, incomplete: str) -> list[tuple[str, str]]:
+    """Shell completion of bundled profile identifiers."""
+    return _bundled_choices(ctx, "profile", incomplete)
+
+
+def complete_components(ctx: typer.Context, incomplete: str) -> list[tuple[str, str]]:
+    """Shell completion of bundled component identifiers."""
+    return _bundled_choices(ctx, "component", incomplete)
+
+
+ProfileOption = Annotated[
+    str,
+    typer.Option("--profile", "-p", help="Profile identifier", autocompletion=complete_profiles),
+]
 OutputOption = Annotated[Path, typer.Option("--output-dir", "-o", help="Existing parent directory")]
 YesOption = Annotated[
     bool, typer.Option("--yes", "-y", help="Accept template defaults without prompting")
@@ -61,6 +93,7 @@ ComponentOption = Annotated[
         "-c",
         help="Add a compatible component (required components are added automatically); "
         "repeat for multiple components",
+        autocompletion=complete_components,
     ),
 ]
 DataOption = Annotated[

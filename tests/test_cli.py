@@ -460,3 +460,34 @@ def test_next_steps_are_human_output_only(tmp_path: Path) -> None:
     assert "Next steps" not in machine.stdout
     assert "lifecycle_commands" in json.loads(machine.stdout)
     assert "Next steps" not in dry.stdout
+
+
+def test_completion_offers_bundled_profile_and_component_ids() -> None:
+    from pytemplate.cli_options import complete_components, complete_profiles
+
+    class Context:
+        params: dict[str, object] = {}
+
+    profiles = [name for name, _ in complete_profiles(Context(), "fast")]  # type: ignore[arg-type]
+    components = [name for name, _ in complete_components(Context(), "data")]  # type: ignore[arg-type]
+    assert profiles == ["fastapi"]
+    assert components == ["database"]
+
+
+def test_completion_is_empty_for_a_template_pack() -> None:
+    from pytemplate.cli_options import complete_profiles
+
+    class Context:
+        params: dict[str, object] = {"template": "gh:org/pack"}
+
+    assert complete_profiles(Context(), "") == []  # type: ignore[arg-type]
+
+
+def test_shell_completion_runs_through_the_cli(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("_PYTEMPLATE_COMPLETE", "complete_bash")
+    monkeypatch.setenv("COMP_WORDS", "pytemplate create demo --profile fast")
+    monkeypatch.setenv("COMP_CWORD", "4")
+
+    result = runner.invoke(app, [])
+
+    assert "fastapi" in result.output
