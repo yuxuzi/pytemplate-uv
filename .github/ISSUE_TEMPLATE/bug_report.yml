@@ -1,0 +1,32 @@
+name: Bug report
+description: Something does not work as documented.
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: pytemplate-uv version
+      description: Output of `pytemplate --version`.
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Operating system and Python version
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command or request
+      description: The exact command, or the request file, that fails.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect, and what happened?
+      description: Include the full output and the exit code.
+    validations:
+      required: true

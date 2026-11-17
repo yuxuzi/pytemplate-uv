@@ -12,12 +12,41 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.3.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
       - run: uv sync --locked
       - run: uv run ruff check .
       - run: uv run ruff format --check pytemplate tests
       - run: uv run mypy
+
+  zizmor:
+    # Static analysis of this repository's own workflows.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: false
+      - run: uvx zizmor .github/workflows
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  docs:
+    # The documentation site must build without warnings.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: false
+      - run: python3 .github/docs/prepare.py
+      - run: uvx zensical==0.1.1 build --clean --strict
 
   test:
     strategy:
@@ -27,12 +56,27 @@ jobs:
         python-version: ["3.11", "3.12", "3.13", "3.14", "3.15"]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.3.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           python-version: ${{ matrix.python-version }}
       - run: uv sync --locked
       - run: uv run pytest
+
+  lowest-direct:
+    # The declared lower bounds must work, not only the locked versions.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          python-version: "3.11"
+      - run: uv sync --resolution lowest-direct
+      - run: uv run --no-sync pytest
 
   generated-projects:
     # Render every distinct component set of each profile and run its own lifecycle commands
@@ -49,8 +93,10 @@ jobs:
       PYTEMPLATE_SMOKE_PROFILE: ${{ matrix.profile }}
       PYTEMPLATE_SMOKE_PYTHON: ${{ matrix.python-version }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.3.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           python-version: ${{ matrix.python-version }}
       - run: uv sync --locked
@@ -59,8 +105,10 @@ jobs:
   package:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.3.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
       - run: uv build
       - run: uvx twine check --strict dist/*
       - name: Inspect, plan, and generate every profile and component from the built wheel
@@ -88,7 +136,7 @@ jobs:
           test -f "$RUNNER_TEMP/wheel-fastapi-keys/alembic.ini"
           test -f "$RUNNER_TEMP/wheel-fastapi-keys/Dockerfile"
           test -f "$RUNNER_TEMP/wheel-fastapi-oidc/SECURITY.md"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dist
           path: dist/
