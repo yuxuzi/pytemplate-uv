@@ -7,7 +7,7 @@ import json
 import shlex
 import sys
 from collections.abc import Callable, Iterator
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Annotated, NoReturn
 
@@ -37,6 +37,7 @@ from pytemplate.cli_options import (
 from pytemplate.configuration import ConfigurationError, load_render_request
 from pytemplate.errors import RenderError, RequestError
 from pytemplate.packs import open_catalog
+from pytemplate.picker import choose_components
 from pytemplate.profiles import (
     Catalog,
     Component,
@@ -177,6 +178,21 @@ def _print_next_steps(project_path: Path, resolution: Resolution, request: Rende
         console.print(f"  {command.replace('{package}', package)}", markup=False)
 
 
+def _with_picked_components(opts: RequestOptions, as_json: bool) -> RequestOptions:
+    """Offer the profile's optional components in a terminal and return the chosen options."""
+    try:
+        with open_catalog(
+            opts.template,
+            opts.template_ref,
+            commit=opts.template_commit,
+            digest=opts.template_digest,
+        ) as (catalog, _, _):
+            chosen = choose_components(catalog.profile(opts.profile), catalog.component_map())
+    except (*_REQUEST_ERRORS, RenderError) as error:
+        _fail(error, as_json)
+    return replace(opts, component=chosen or None)
+
+
 def _render_and_report(build: Callable[[], RenderRequest], as_json: bool) -> None:
     """Render one request and display an actionable outcome."""
     try:
@@ -238,6 +254,8 @@ def create(
             ),
             as_json,
         )
+    if not unattended and not opts.component:
+        opts = _with_picked_components(opts, as_json)
     _render_and_report(
         lambda: opts.build(project_name, no_input=unattended, overwrite=force, dry_run=dry_run),
         as_json,

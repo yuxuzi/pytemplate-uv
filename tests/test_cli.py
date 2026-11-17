@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 from typer.testing import CliRunner
@@ -513,3 +514,74 @@ def test_validate_opens_the_catalog_once_and_refuses_an_existing_target(
     assert exists.exit_code == 1
     assert "Output already exists" in exists.stderr
     assert len(opened) == 2
+
+
+class _FakeCheckbox:
+    def __init__(self, answer: list[str] | None) -> None:
+        self.answer = answer
+
+    def ask(self) -> list[str] | None:
+        return self.answer
+
+
+def _interactive(
+    monkeypatch: pytest.MonkeyPatch, answer: list[str] | None
+) -> tuple[list[Any], list[rendering.RenderRequest]]:
+    import questionary
+
+    seen: list[object] = []
+    monkeypatch.setattr("pytemplate.main._stdin_is_tty", lambda: True)
+
+    def checkbox(message: str, choices: list[object], **_: object) -> _FakeCheckbox:
+        seen.extend(choices)
+        return _FakeCheckbox(answer)
+
+    monkeypatch.setattr(questionary, "checkbox", checkbox)
+    requests: list[rendering.RenderRequest] = []
+    real = rendering.render
+
+    def capture(request: rendering.RenderRequest) -> rendering.RenderResult:
+        requests.append(request)
+        return real(request)
+
+    monkeypatch.setattr("pytemplate.main.render", capture)
+    return seen, requests
+
+
+def test_picker_offers_optional_components_and_passes_the_choice_on(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen, requests = _interactive(monkeypatch, ["database"])
+
+    result = runner.invoke(
+        app, ["create", "demo", "-p", "fastapi", "-o", str(tmp_path), "--dry-run"]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert {choice.value for choice in seen} >= {"database", "worker"}
+    assert requests[0].components == ("database",)
+
+
+def test_picker_is_skipped_with_explicit_components_or_nothing_optional(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen, _ = _interactive(monkeypatch, [])
+
+    explicit = runner.invoke(
+        app, ["create", "demo", "-p", "fastapi", "-c", "worker", "-o", str(tmp_path), "--dry-run"]
+    )
+
+    assert explicit.exit_code == 0, explicit.output
+    assert seen == []  # the picker never ran
+
+
+def test_cancelling_the_picker_creates_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _interactive(monkeypatch, None)
+
+    result = runner.invoke(app, ["create", "demo", "-p", "fastapi", "-o", str(tmp_path)])
+
+    assert result.exit_code == 1
+    assert "Cancelled" in result.stderr
+    assert not (tmp_path / "demo").exists()
