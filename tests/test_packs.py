@@ -487,3 +487,58 @@ def test_an_unknown_commit_hash_is_a_pack_error(pack: Path, tmp_path: Path) -> N
     with pytest.raises(PackError, match="Could not fetch template pack"):
         with open_catalog(pack.as_uri(), "0" * 40):
             pass
+
+
+@pytest.mark.parametrize(
+    "setting",
+    [
+        "{_tasks: [echo hi], _other: 1}",
+        "{_migrations: []}",
+        "{_jinja_extensions: [x.Ext]}",
+        "{_external_data: {x: y.yml}}",
+        "_external_data:\n  x: y.yml",
+        '"_tasks": [echo hi]',
+    ],
+)
+def test_flow_style_and_other_spellings_of_unsafe_settings_are_rejected(
+    pack: Path, tmp_path: Path, setting: str
+) -> None:
+    (pack / "extra.yaml").write_text(setting + "\n", encoding="utf-8")
+
+    with pytest.raises(PackError, match="declares '_"):
+        render(_request(pack, tmp_path))
+
+
+def test_an_unsafe_setting_in_an_included_file_is_rejected(pack: Path, tmp_path: Path) -> None:
+    nested = pack / "parts"
+    nested.mkdir()
+    (nested / "more.yml").write_text("--- !include deeper.yml\n", encoding="utf-8")
+    (nested / "deeper.yml").write_text("_tasks: [echo hi]\n", encoding="utf-8")
+    copier_yml = pack / "copier.yml"
+    copier_yml.write_text(
+        copier_yml.read_text(encoding="utf-8") + "\n--- !include parts/more.yml\n", "utf-8"
+    )
+
+    with pytest.raises(PackError, match=r"deeper.yml declares '_tasks'"):
+        render(_request(pack, tmp_path))
+
+
+def test_an_include_outside_the_pack_is_rejected(pack: Path, tmp_path: Path) -> None:
+    (tmp_path / "outside.yml").write_text("a: 1\n", encoding="utf-8")
+    copier_yml = pack / "copier.yml"
+    copier_yml.write_text(
+        copier_yml.read_text(encoding="utf-8") + "\n--- !include ../outside.yml\n", "utf-8"
+    )
+
+    with pytest.raises(PackError, match="outside the pack"):
+        render(_request(pack, tmp_path))
+
+
+def test_unknown_yaml_tags_and_broken_yaml_are_rejected(pack: Path, tmp_path: Path) -> None:
+    (pack / "extra.yml").write_text("a: !!python/object/apply:os.getcwd []\n", encoding="utf-8")
+    with pytest.raises(PackError, match="YAML tag"):
+        render(_request(pack, tmp_path))
+
+    (pack / "extra.yml").write_text("a: [unclosed\n", encoding="utf-8")
+    with pytest.raises(PackError, match="not valid YAML"):
+        render(_request(pack, tmp_path))

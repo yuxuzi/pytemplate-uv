@@ -29,8 +29,8 @@ from pytemplate.profiles import (
 
 PACK_FILE = "pytemplate-pack.toml"
 BUNDLED = "bundled"
-# Copier settings that run code or load extensions; packs must never declare them.
-_UNSAFE_SETTINGS = re.compile(r"^(_tasks|_migrations|_jinja_extensions)\s*:", re.MULTILINE)
+# Copier settings that run code, load extensions, or fetch data; packs must never declare them.
+_UNSAFE_SETTINGS = ("_tasks", "_migrations", "_jinja_extensions", "_external_data")
 _GIT_PREFIXES = ("gh:", "gl:", "git+", "https://", "http://", "ssh://", "git@", "file://")
 _PACK_KEYS = frozenset({"contract", "id", "name", "description", "version"})
 _COMMIT = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
@@ -205,6 +205,77 @@ def _check_pin(
         raise PackError(f"Template digest must be a lowercase SHA-256 hash, got '{digest}'.")
 
 
+def _yaml_documents(path: Path) -> tuple[list[Any], list[str]]:
+    """Parse every document of a pack YAML file and list the files it ``!include``s.
+
+    Copier's ``!include`` tag is tolerated and not followed here; any other tag is refused.
+    """
+    import yaml
+
+    includes: list[str] = []
+
+    class Loader(yaml.SafeLoader):
+        """A safe loader that records Copier's ``!include`` tag instead of resolving it."""
+
+    def include(loader: yaml.SafeLoader, node: yaml.Node) -> None:
+        if isinstance(node, yaml.ScalarNode):
+            includes.append(str(node.value))
+        elif isinstance(node, yaml.SequenceNode):
+            includes.extend(str(loader.construct_object(item)) for item in node.value)
+
+    def refuse(loader: yaml.SafeLoader, suffix: str, node: yaml.Node) -> None:
+        raise PackError(f"Template pack file {path.name} uses the YAML tag '{node.tag}'.")
+
+    Loader.add_constructor("!include", include)
+    Loader.add_multi_constructor("", refuse)
+    try:
+        documents = list(yaml.load_all(path.read_text(encoding="utf-8"), Loader=Loader))
+    except (yaml.YAMLError, UnicodeDecodeError) as error:
+        raise PackError(f"Template pack file {path.name} is not valid YAML: {error}") from error
+    return documents, includes
+
+
+def _included_files(root: Path, config: Path, names: Sequence[str]) -> list[Path]:
+    """Return the files ``config`` includes, which must stay inside the pack."""
+    found: list[Path] = []
+    for name in names:
+        if "{{" in name or "{%" in name:
+            raise PackError(
+                f"Template pack file {config.name} includes '{name}', which cannot be checked; "
+                "name the included file without a template expression."
+            )
+        for candidate in sorted(config.parent.glob(name)):
+            resolved = candidate.resolve()
+            if root.resolve() not in resolved.parents:
+                raise PackError(
+                    f"Template pack file {config.name} includes '{name}', outside the pack."
+                )
+            if resolved.is_file():
+                found.append(resolved)
+    return found
+
+
+def _check_settings(root: Path) -> None:
+    """Reject a pack whose Copier configuration declares a setting that runs code."""
+    pending = [*root.glob("*.yml"), *root.glob("*.yaml")]
+    seen: set[Path] = set()
+    while pending:
+        config = pending.pop().resolve()
+        if config in seen or not config.is_file():
+            continue
+        seen.add(config)
+        documents, includes = _yaml_documents(config)
+        for document in documents:
+            if isinstance(document, dict):
+                for setting in _UNSAFE_SETTINGS:
+                    if setting in document:
+                        raise PackError(
+                            f"Template pack file {config.name} declares '{setting}', which "
+                            "pytemplate never runs; remove it from the pack."
+                        )
+        pending.extend(_included_files(root, config, includes))
+
+
 def _check_safe(root: Path) -> None:
     """Reject symlinks (Copier would copy their targets) and code-running Copier settings."""
     for path in root.rglob("*"):
@@ -212,13 +283,7 @@ def _check_safe(root: Path) -> None:
             raise PackError(
                 f"Template pack contains a symlink, which is not allowed: {path.relative_to(root)}"
             )
-    for config in [*root.glob("*.yml"), *root.glob("*.yaml")]:
-        match = _UNSAFE_SETTINGS.search(config.read_text(encoding="utf-8"))
-        if match:
-            raise PackError(
-                f"Template pack file {config.name} declares '{match.group(1)}', which "
-                "pytemplate never runs; remove it from the pack."
-            )
+    _check_settings(root)
 
 
 def _read_pack(root: Path) -> tuple[str, str]:
