@@ -26,6 +26,15 @@ PYTEMPLATE_SMOKE=1 uv run pytest tests/test_generated_projects.py   # needs netw
 PYTEMPLATE_SMOKE=1 PYTEMPLATE_SMOKE_PROFILE=fastapi uv run pytest tests/test_generated_projects.py
 ```
 
+## Changing the command line
+
+- `pytemplate/main.py` is presentation only; put logic in a module that does not import Typer
+  (see `status.py` and `post_create.py`).
+- Tests call `create` with `-y` (the old `--no-input` is a deprecated, hidden alias). Errors and
+  warnings are on stderr, so assert on `result.stderr`; `--json` output is on `result.stdout`.
+- Tests never need a real terminal or network: patch `pytemplate.main._stdin_is_tty`,
+  `questionary.checkbox`, and `pytemplate.post_create.subprocess.run`.
+
 ## Changing templates
 
 - Templates are Copier templates in `pytemplate/templates/<profile>/`. Only files ending in

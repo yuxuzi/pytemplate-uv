@@ -37,8 +37,15 @@ template change, also run the smoke tests. Report the real results.
 ## Layout
 
 - `pytemplate/main.py`: Typer commands (`create`, `plan`, `validate`, `create-from-config`,
-  `list-*`/`describe-*`, `schema`, `skill show|install`), with `--json` and exit codes 0, 1
-  (invalid request), and 2 (render failure). Presentation only.
+  `status`, `list-*`/`describe-*`, `schema`, `skill show|install`), with `--json` and exit codes
+  0, 1 (invalid request), and 2 (render failure). Presentation only; errors and warnings go to
+  stderr. `create` takes `-y/--yes` (`--no-input` is a hidden, deprecated alias until 4.0).
+- `pytemplate/cli_options.py`: the request options shared by `create`, `validate`, and `plan`,
+  declared once (`RequestOptions`, `@request_options`), plus shell completion.
+- `pytemplate/picker.py`: the interactive choice of optional components (questionary).
+- `pytemplate/status.py`: `pytemplate status`, a read-only comparison with `.pytemplate.toml`.
+- `pytemplate/post_create.py`: the opt-in `--lock` and `--git` steps (never on `--dry-run`).
+- `pytemplate/suggestions.py`: "did you mean" hints for error messages.
 - `pytemplate/api.py`: the supported Python interface; re-exports only.
 - `pytemplate/profiles.py`: strict loading of contract-1 manifests into a `Catalog`, plus
   `check_catalog()` and `bundled_catalog()`.

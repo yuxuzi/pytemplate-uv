@@ -109,6 +109,8 @@ target path, then wait for explicit confirmation before creating anything.**
 uvx pytemplate-uv create-from-config market-data-api.request.toml
 ```
 
+Never run an interactive `create` yourself: without a terminal it exits 1 and asks for `-y`.
+If you use `create` instead of a request file, pass `-y` (and `--json` when you need to parse it).
 If the target already exists, stop and ask. Use `--force` only when the user explicitly wants the
 existing directory replaced. Delete the request file afterwards, or keep it if the user wants a
 reproducible record.
@@ -127,7 +129,8 @@ name): `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy <pack
 `uv run pytest`, and component commands such as `uv run alembic upgrade head`. Report the real
 results. If something fails, show the output; do not hide or
 "fix" it by weakening checks. Finish by pointing the user to the generated `README.md` and
-`AGENTS.md` (`CLAUDE.md` imports it), and suggest committing the initial project (`git add -A && git commit`).
+`AGENTS.md` (`CLAUDE.md` imports it), and suggest committing the initial project (`git add -A && git commit`). To see later whether
+generated files were edited, run `uvx pytemplate-uv status <project>` (read-only, accepts `--json`).
 
 ## Rules
 

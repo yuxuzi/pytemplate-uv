@@ -75,7 +75,7 @@ jobs:
           create() {
             name="$1"; shift
             pt plan --name "$name" -o "$RUNNER_TEMP" "$@" --json > /dev/null
-            pt create "$name" -o "$RUNNER_TEMP" --no-input "$@"
+            pt create "$name" -o "$RUNNER_TEMP" -y "$@"
             for path in .gitignore .github/workflows/ci.yml CLAUDE.md .pytemplate.toml \
                 .copier-answers.yml; do
               test -f "$RUNNER_TEMP/$name/$path"
