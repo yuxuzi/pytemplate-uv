@@ -10,6 +10,11 @@ import pytest
 # path happens to end. Render wide so text assertions never depend on the machine. This runs
 # before any test module imports the CLI, whose console reads COLUMNS when it is created.
 os.environ["COLUMNS"] = "1000"
+# CI services force colour (GITHUB_ACTIONS, FORCE_COLOR), and ANSI styles split the text that
+# tests look for. Typer and Rich read these when imported, so clear them here, before the CLI is.
+for _variable in ("FORCE_COLOR", "PY_COLORS", "GITHUB_ACTIONS", "TTY_COMPATIBLE"):
+    os.environ.pop(_variable, None)
+os.environ["NO_COLOR"] = "1"
 
 ANSWERS_TEMPLATE = "{{ _copier_answers|to_nice_yaml -}}\n"
 

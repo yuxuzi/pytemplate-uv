@@ -12,6 +12,7 @@ from importlib.resources.abc import Traversable
 from typing import Any
 
 from pytemplate.errors import RequestError
+from pytemplate.suggestions import did_you_mean
 
 CONTRACT_VERSION = 1
 PROFILE_KINDS = ("library", "cli", "service")
@@ -436,8 +437,12 @@ class Catalog:
             if identifier == profile.identifier or identifier in profile.aliases:
                 return profile
         available = ", ".join(profile.identifier for profile in self.profiles)
+        known = [
+            name for profile in self.profiles for name in (profile.identifier, *profile.aliases)
+        ]
         raise ProfileNotFoundError(
-            f"Unknown profile '{identifier}'. Available profiles: {available}."
+            f"Unknown profile '{identifier}'.{did_you_mean(identifier, known)} "
+            f"Available profiles: {available}."
         )
 
     def component(self, identifier: str) -> Component:
@@ -446,8 +451,10 @@ class Catalog:
             if component.identifier == identifier:
                 return component
         available = ", ".join(component.identifier for component in self.components)
+        known = [component.identifier for component in self.components]
         raise ComponentNotFoundError(
-            f"Unknown component '{identifier}'. Available components: {available}."
+            f"Unknown component '{identifier}'.{did_you_mean(identifier, known)} "
+            f"Available components: {available}."
         )
 
     def component_map(self) -> dict[str, Component]:

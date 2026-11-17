@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import contextlib
 import json
+import shlex
+import sys
 from collections.abc import Callable, Iterator
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Annotated, NoReturn
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from pytemplate.agent_skill import (
@@ -19,9 +22,23 @@ from pytemplate.agent_skill import (
     install_skill,
     skill_text,
 )
+from pytemplate.cli_options import (
+    ConfigArgument,
+    ForceOption,
+    JsonOption,
+    NameOption,
+    NoInputOption,
+    RequestOptions,
+    TemplateOption,
+    TemplateRefOption,
+    YesOption,
+    request_options,
+)
 from pytemplate.configuration import ConfigurationError, load_render_request
 from pytemplate.errors import RenderError, RequestError
 from pytemplate.packs import open_catalog
+from pytemplate.picker import choose_components
+from pytemplate.post_create import run_post_steps
 from pytemplate.profiles import (
     Catalog,
     Component,
@@ -37,10 +54,11 @@ from pytemplate.rendering import (
     generator_version,
     plan,
     render,
-    validate_request,
 )
 from pytemplate.resolution import Resolution
 from pytemplate.schema import SCHEMAS
+from pytemplate.status import project_status
+from pytemplate.suggestions import did_you_mean
 
 app = typer.Typer(
     name="pytemplate",
@@ -48,6 +66,7 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 console = Console()
+err_console = Console(stderr=True, soft_wrap=True)
 skill_app = typer.Typer(help="Install or print the AI agent skill for creating projects.")
 app.add_typer(skill_app, name="skill")
 
@@ -64,69 +83,14 @@ _REQUEST_ERRORS = (
     ManifestError,
 )
 
-JsonOption = Annotated[bool, typer.Option("--json", help="Print machine-readable JSON.")]
-TemplateOption = Annotated[
-    str | None,
-    typer.Option(
-        "--template",
-        "-t",
-        help="External template pack: a directory or git source such as gh:org/repo",
-    ),
-]
-TemplateRefOption = Annotated[
-    str | None,
-    typer.Option("--template-ref", help="Git tag or branch of the --template pack"),
-]
-TemplateCommitOption = Annotated[
-    str | None,
-    typer.Option(
-        "--template-commit",
-        help="Refuse the git pack unless --template-ref resolves to this full commit hash",
-    ),
-]
-TemplateDigestOption = Annotated[
-    str | None,
-    typer.Option(
-        "--template-digest",
-        help="Refuse the git pack unless its files match this SHA-256 digest",
-    ),
-]
-ProfileOption = Annotated[str, typer.Option("--profile", "-p", help="Profile identifier")]
-OutputOption = Annotated[Path, typer.Option("--output-dir", "-o", help="Existing parent directory")]
-NoInputOption = Annotated[
-    bool, typer.Option("--no-input", help="Accept template defaults without prompting")
-]
-ForceOption = Annotated[
-    bool, typer.Option("--force", "-f", help="Allow overwriting an existing output")
-]
-ComponentOption = Annotated[
-    list[str] | None,
-    typer.Option(
-        "--component",
-        "-c",
-        help="Add a compatible component (required components are added automatically); "
-        "repeat for multiple components",
-    ),
-]
-DataOption = Annotated[
-    list[str] | None,
-    typer.Option(
-        "--data",
-        "-d",
-        help="Answer a template question as KEY=VALUE; repeat for multiple answers",
-    ),
-]
-ConfigArgument = Annotated[
-    Path | None,
-    typer.Argument(help="TOML render-request file; when omitted, use the options below"),
-]
-NameOption = Annotated[
-    str, typer.Option("--name", "-n", help="Project slug, when no request file is given")
-]
-
 
 def _echo_json(payload: object) -> None:
     typer.echo(json.dumps(payload, indent=2))
+
+
+def _stdin_is_tty() -> bool:
+    """Report whether prompts can be answered; tests replace this."""
+    return sys.stdin.isatty()
 
 
 def _fail(error: Exception, as_json: bool) -> NoReturn:
@@ -141,7 +105,7 @@ def _fail(error: Exception, as_json: bool) -> NoReturn:
             }
         )
     else:
-        console.print(f"[red]Error:[/] {error}")
+        err_console.print(f"[red]Error:[/] {escape(str(error))}")
     raise typer.Exit(code=code) from error
 
 
@@ -198,56 +162,49 @@ def _root(
     """Generate deterministic Python projects from profiles, components, and template packs."""
 
 
-def _parse_data(pairs: list[str] | None) -> dict[str, str]:
-    """Parse repeated KEY=VALUE options into template answers."""
-    data: dict[str, str] = {}
-    for pair in pairs or ():
-        key, separator, value = pair.partition("=")
-        if not separator or not key:
-            raise ConfigurationError(f"Template data must be KEY=VALUE, got '{pair}'.")
-        data[key] = value
-    return data
-
-
 def _request(
-    *,
-    config: Path | None,
-    project_name: str,
-    profile: str,
-    output_dir: Path,
-    components: list[str] | None,
-    data: list[str] | None,
-    template: str | None,
-    template_ref: str | None,
-    template_commit: str | None = None,
-    template_digest: str | None = None,
-    no_input: bool = True,
-    overwrite: bool = False,
-    dry_run: bool = False,
+    config: Path | None, project_name: str, opts: RequestOptions, **flags: bool
 ) -> RenderRequest:
     """Build a request from a TOML file or from command-line options."""
     if config is not None:
-        return load_render_request(config, dry_run=dry_run)
-    return RenderRequest(
-        profile_id=profile,
-        project_name=project_name,
-        output_dir=output_dir,
-        components=tuple(components or ()),
-        no_input=no_input,
-        overwrite=overwrite,
-        dry_run=dry_run,
-        data=_parse_data(data),
-        template=template,
-        template_ref=template_ref,
-        template_commit=template_commit,
-        template_digest=template_digest,
-    )
+        return load_render_request(config, dry_run=flags.get("dry_run", False))
+    return opts.build(project_name, **flags)
 
 
-def _render_and_report(build: Callable[[], RenderRequest], as_json: bool) -> None:
+def _print_next_steps(project_path: Path, resolution: Resolution, request: RenderRequest) -> None:
+    """Tell the user how to enter the new project and run the profile's lifecycle commands."""
+    package = request.data.get("package_name", request.project_name.replace("-", "_"))
+    console.print("\nNext steps:")
+    console.print(f"  cd {shlex.quote(str(project_path))}", markup=False)
+    for command in resolution.lifecycle_commands:
+        console.print(f"  {command.replace('{package}', package)}", markup=False)
+
+
+def _with_picked_components(opts: RequestOptions, as_json: bool) -> RequestOptions:
+    """Offer the profile's optional components in a terminal and return the chosen options."""
+    try:
+        with open_catalog(
+            opts.template,
+            opts.template_ref,
+            commit=opts.template_commit,
+            digest=opts.template_digest,
+        ) as (catalog, _, _):
+            chosen = choose_components(catalog.profile(opts.profile), catalog.component_map())
+    except (*_REQUEST_ERRORS, RenderError) as error:
+        _fail(error, as_json)
+    return replace(opts, component=chosen or None)
+
+
+def _render_and_report(
+    build: Callable[[], RenderRequest],
+    as_json: bool,
+    after: Callable[[Path], list[str]] | None = None,
+) -> None:
     """Render one request and display an actionable outcome."""
     try:
-        result = render(build())
+        request = build()
+        result = render(request)
+        steps = after(result.project_path) if after and not result.dry_run else []
     except (*_REQUEST_ERRORS, RenderError) as error:
         _fail(error, as_json)
     if as_json:
@@ -271,46 +228,53 @@ def _render_and_report(build: Callable[[], RenderRequest], as_json: bool) -> Non
         f"[green]Created[/] '{result.profile.identifier}' project at {result.project_path}"
     )
     console.print(f"Components: {', '.join(result.resolution.component_ids) or 'none'}")
+    for step in steps:
+        console.print(f"[green]Also[/] {step}")
+    _print_next_steps(result.project_path, result.resolution, request)
 
 
 @app.command("create")
+@request_options
 def create(
     project_name: Annotated[
         str, typer.Argument(help="Lowercase project slug, for example: market-data-api")
     ],
-    profile: ProfileOption = "python",
-    output_dir: OutputOption = Path("."),
+    opts: RequestOptions,
+    as_json: bool,
+    yes: YesOption = False,
     no_input: NoInputOption = False,
     force: ForceOption = False,
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Validate and show the target without writing files")
     ] = False,
-    component: ComponentOption = None,
-    data: DataOption = None,
-    template: TemplateOption = None,
-    template_ref: TemplateRefOption = None,
-    template_commit: TemplateCommitOption = None,
-    template_digest: TemplateDigestOption = None,
-    as_json: JsonOption = False,
+    git: Annotated[
+        bool, typer.Option("--git", help="Run git init and make the first commit afterwards")
+    ] = False,
+    lock: Annotated[
+        bool, typer.Option("--lock", help="Run `uv lock` in the new project afterwards")
+    ] = False,
 ) -> None:
     """Create a project from a bundled profile or a template pack."""
+    if no_input:
+        err_console.print(
+            "[yellow]Warning:[/] --no-input is deprecated; use -y/--yes. It will be removed in 4.0."
+        )
+    # Machine output never prompts, so --json implies --yes.
+    unattended = yes or no_input or as_json
+    if not unattended and not _stdin_is_tty():
+        _fail(
+            RequestError(
+                "Cannot prompt for answers: standard input is not a terminal. Pass -y/--yes to "
+                "accept the template defaults, and --data KEY=VALUE to set individual answers."
+            ),
+            as_json,
+        )
+    if not unattended and not opts.component:
+        opts = _with_picked_components(opts, as_json)
     _render_and_report(
-        lambda: _request(
-            config=None,
-            project_name=project_name,
-            profile=profile,
-            output_dir=output_dir,
-            components=component,
-            data=data,
-            template=template,
-            template_ref=template_ref,
-            template_commit=template_commit,
-            template_digest=template_digest,
-            no_input=no_input,
-            overwrite=force,
-            dry_run=dry_run,
-        ),
+        lambda: opts.build(project_name, no_input=unattended, overwrite=force, dry_run=dry_run),
         as_json,
+        after=(lambda path: run_post_steps(path, git=git, lock=lock)) if git or lock else None,
     )
 
 
@@ -507,36 +471,22 @@ def _plan_dict(result: RenderPlan) -> dict[str, object]:
 
 
 @app.command("validate")
+@request_options
 def validate_config(
+    opts: RequestOptions,
+    as_json: bool,
     config: ConfigArgument = None,
     project_name: NameOption = "my-project",
-    profile: ProfileOption = "python",
-    output_dir: OutputOption = Path("."),
-    component: ComponentOption = None,
-    data: DataOption = None,
-    template: TemplateOption = None,
-    template_ref: TemplateRefOption = None,
-    template_commit: TemplateCommitOption = None,
-    template_digest: TemplateDigestOption = None,
-    as_json: JsonOption = False,
 ) -> None:
     """Validate a render request, including template answers, without writing the project."""
     try:
-        request = _request(
-            config=config,
-            project_name=project_name,
-            profile=profile,
-            output_dir=output_dir,
-            components=component,
-            data=data,
-            template=template,
-            template_ref=template_ref,
-            template_commit=template_commit,
-            template_digest=template_digest,
-            dry_run=True,
-        )
-        resolution, project_path = validate_request(request)
+        request = _request(config, project_name, opts, dry_run=True)
         planned = plan(request)
+        if planned.target_exists and not request.overwrite:
+            raise RequestError(
+                f"Output already exists: {planned.project_path}. Re-run with --force only if "
+                "overwriting is intended."
+            )
     except (*_REQUEST_ERRORS, RenderError) as error:
         _fail(error, as_json)
     if as_json:
@@ -544,42 +494,24 @@ def validate_config(
         del payload["files"]
         _echo_json(payload)
         return
-    console.print(f"[green]Valid[/] {resolution.profile.identifier} -> {project_path}")
+    resolution = planned.resolution
+    console.print(f"[green]Valid[/] {resolution.profile.identifier} -> {planned.project_path}")
     console.print(f"Components: {', '.join(resolution.component_ids) or 'none'}")
     if resolution.added:
         console.print(f"Added by requirements: {', '.join(resolution.added)}")
 
 
 @app.command("plan")
+@request_options
 def plan_command(
+    opts: RequestOptions,
+    as_json: bool,
     config: ConfigArgument = None,
     project_name: NameOption = "my-project",
-    profile: ProfileOption = "python",
-    output_dir: OutputOption = Path("."),
-    component: ComponentOption = None,
-    data: DataOption = None,
-    template: TemplateOption = None,
-    template_ref: TemplateRefOption = None,
-    template_commit: TemplateCommitOption = None,
-    template_digest: TemplateDigestOption = None,
-    as_json: JsonOption = False,
 ) -> None:
     """Show the resolved components, dependencies, and exact files, without writing anything."""
     try:
-        result = plan(
-            _request(
-                config=config,
-                project_name=project_name,
-                profile=profile,
-                output_dir=output_dir,
-                components=component,
-                data=data,
-                template=template,
-                template_ref=template_ref,
-                template_commit=template_commit,
-                template_digest=template_digest,
-            )
-        )
+        result = plan(_request(config, project_name, opts))
     except (*_REQUEST_ERRORS, RenderError) as error:
         _fail(error, as_json)
     if as_json:
@@ -603,6 +535,36 @@ def plan_command(
         console.print(f"  {name}", markup=False)
 
 
+@app.command("status")
+def status_command(
+    path: Annotated[
+        Path, typer.Argument(help="Generated project to inspect (default: current directory)")
+    ] = Path("."),
+    as_json: JsonOption = False,
+) -> None:
+    """List files changed, deleted, or added since the project was generated (read-only)."""
+    try:
+        report = project_status(path)
+    except _REQUEST_ERRORS as error:
+        _fail(error, as_json)
+    if as_json:
+        _echo_json(report.as_dict())
+        return
+    if report.clean:
+        console.print(f"[green]No changes[/] since generation in {report.project_path}")
+        return
+    console.print(f"Changes since generation in {report.project_path}:")
+    for label, names in (
+        ("Changed", report.changed),
+        ("Deleted", report.deleted),
+        ("Added", report.added),
+    ):
+        if names:
+            console.print(f"{label} ({len(names)}):")
+            for name in names:
+                console.print(f"  {name}", markup=False)
+
+
 @app.command("schema")
 def schema_command(
     name: Annotated[
@@ -612,7 +574,10 @@ def schema_command(
 ) -> None:
     """Print a JSON Schema for a manifest, request, or generated-project file."""
     if name not in SCHEMAS:
-        console.print(f"[red]Error:[/] Unknown schema '{name}'. Available: {', '.join(SCHEMAS)}.")
+        err_console.print(
+            f"[red]Error:[/] Unknown schema '{name}'.{did_you_mean(name, SCHEMAS)} "
+            f"Available: {', '.join(SCHEMAS)}."
+        )
         raise typer.Exit(code=EXIT_INVALID)
     _echo_json(SCHEMAS[name])
 
@@ -647,7 +612,7 @@ def skill_install(
         skills_dir = dest if dest is not None else default_skills_dir(project=project, agent=agent)
         target = install_skill(skills_dir, force=force)
     except SkillInstallError as error:
-        console.print(f"[red]Error:[/] {error}")
+        err_console.print(f"[red]Error:[/] {escape(str(error))}")
         raise typer.Exit(code=1) from error
     console.print(f"[green]Installed[/] skill at {target}")
 

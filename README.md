@@ -98,11 +98,14 @@ Requires Python 3.11–3.15. Runs on Linux, macOS, and Windows. Also available v
 ### 30-second quickstart
 
 ```bash
-pytemplate create my-api -p fastapi -c database -c auth-oidc --no-input
+uvx pytemplate-uv create my-api -p fastapi -c database -c auth-oidc -y
 cd my-api
 uv sync
 uv run pytest
 ```
+
+(If you installed the `pytemplate` command, write `pytemplate create ...`.) When it finishes,
+`create` prints the next steps: the `cd` and the profile's own lifecycle commands.
 
 That's it: a layered FastAPI service with a database, OIDC authentication, tests, a GitHub
 Actions workflow, structured logging, and health checks.
@@ -111,13 +114,13 @@ Actions workflow, structured logging, and health checks.
 
 ```bash
 # Python CLI tool
-pytemplate create my-tool -p python --no-input
+pytemplate create my-tool -p python -y
 
 # FastAPI service with background jobs
-pytemplate create my-service -p fastapi -c worker -c database --no-input
+pytemplate create my-service -p fastapi -c worker -c database -y
 
 # Containerized API with API key auth
-pytemplate create my-api -p fastapi -c auth-api-key -c container --no-input
+pytemplate create my-api -p fastapi -c auth-api-key -c container -y
 
 # Preview before writing anything
 pytemplate plan --name my-api -p fastapi -c database -c auth-oidc
@@ -128,10 +131,10 @@ pytemplate validate --name my-api -p fastapi -c auth
 ```
 
 `create-project` is an optional shortcut with the same arguments and options as
-`pytemplate create`:
+`pytemplate create` (`uvx pytemplate-uv create NAME` needs no shortcut):
 
 ```bash
-uvx --from pytemplate-uv create-project pricing-api -p fastapi --no-input
+uvx --from pytemplate-uv create-project pricing-api -p fastapi -y
 ```
 
 ### Commands
@@ -142,6 +145,7 @@ uvx --from pytemplate-uv create-project pricing-api -p fastapi --no-input
 | `plan` | Preview files and dependencies (no write) |
 | `validate` | Check for errors before rendering |
 | `create-from-config FILE` | Render from a TOML request file |
+| `status [PATH]` | List files changed, deleted, or added since generation (read-only) |
 | `list-profiles` / `describe-profile ID` | Show profiles and their inputs |
 | `list-components` / `describe-component ID` | Show components: requirements, conflicts, dependencies, files, settings |
 | `schema NAME` | Print a JSON Schema (`profile`, `component`, `pack`, `request`, `manifest`) |
@@ -168,11 +172,31 @@ uvx --from pytemplate-uv create-project pricing-api -p fastapi --no-input
   - Inputs are `package_name`, `description`, `author`, `email`, `python_version` (3.11–3.15),
     and `license` (an SPDX expression).
 - `--template`, `-t SOURCE` and `--template-ref REF`: render from a template pack (see below).
-- `--no-input`: accept defaults instead of prompting.
+- `--yes`, `-y`: accept the template defaults instead of prompting. Without it, `create`
+  prompts, and the picker below asks for optional components; when standard input is not a
+  terminal it exits 1 before rendering and asks for `-y`. `--json` implies `-y`.
+  `--no-input` still works but is deprecated: it prints a warning on stderr and goes away in 4.0.
+- `--git`: after rendering, run `git init` and commit everything as "Initial commit from
+  pytemplate-uv". `--lock`: run `uv lock` first, so the commit includes `uv.lock`. Neither is
+  ever the default, and neither runs with `--dry-run`. If a step fails, the project stays and the
+  exit code is 2 with a message saying what was created and what failed.
 - `--dry-run`: validate and show the target without writing.
 - `--force`, `-f`: replace an existing directory. The project is rendered into a staging
   directory and swapped in only after rendering succeeds, so no stale files remain.
 - `--json`: print the result as JSON.
+
+### Component picker, completion, and status
+
+- In a terminal, without `-y`, `--json`, or `-c`, `create` offers the profile's optional components
+  as a multi-select list. Required components are still added, and conflicts still refused.
+- `--profile` and `--component` complete in your shell (for the bundled catalog) once you run
+  `pytemplate --install-completion`.
+- `pytemplate status [PATH]` compares a generated project with the SHA-256 inventory in
+  `.pytemplate.toml` and lists the files you changed, deleted, or added. It ignores `.git/`,
+  `.venv/`, caches, `uv.lock`, and the manifest, never writes, accepts `--json`, and exits 1 when
+  `PATH` has no valid manifest.
+- Errors and warnings go to stderr; only `--json` output and results go to stdout. A misspelled
+  profile, component, schema, or `--data` key gets a "Did you mean" suggestion.
 
 ### Reproducible render requests
 
@@ -220,7 +244,7 @@ my-pack/
 
 ```bash
 pytemplate list-profiles --template ./my-pack
-pytemplate create my-tool -p tool --template gh:org/my-pack --template-ref v1.2.0 --no-input
+pytemplate create my-tool -p tool --template gh:org/my-pack --template-ref v1.2.0 -y
 ```
 
 - Packs are selected explicitly for each request; nothing is discovered or installed.
@@ -232,7 +256,7 @@ pytemplate create my-tool -p tool --template gh:org/my-pack --template-ref v1.2.
   pack that changed, pin them:
   ```bash
   pytemplate create my-tool -p tool --template gh:org/my-pack --template-ref v1.2.0 \
-    --template-commit <commit> --template-digest <digest> --no-input
+    --template-commit <commit> --template-digest <digest> -y
   ```
 - See [docs/compatibility.md](docs/compatibility.md) for the versioning rules.
 
@@ -245,7 +269,7 @@ one-line import of it, so Claude Code reads the same text.
 To build something an agent can call, add `mcp` to a `python` project:
 
 ```bash
-pytemplate create pricing-tools --profile python --component mcp --no-input
+pytemplate create pricing-tools --profile python --component mcp -y
 cd pricing-tools && uv sync && uv run pytest
 ```
 

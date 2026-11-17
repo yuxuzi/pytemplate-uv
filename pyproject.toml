@@ -26,6 +26,7 @@ classifiers = [
 ]
 dependencies = [
     "copier>=9.5,<10",
+    "questionary>=2.0",
     "rich>=13.7.0",
     "typer>=0.15.4",
 ]
