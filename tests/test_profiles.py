@@ -36,6 +36,7 @@ def test_bundled_catalog_satisfies_the_contract() -> None:
         "auth-oidc",
         "container",
         "database",
+        "devcontainer",
         "worker",
     )
     assert fastapi.legacy_components == ("container", "database")
@@ -127,7 +128,14 @@ def test_catalog_rejects_unknown_component_references() -> None:
 def test_catalog_rejects_a_compatible_component_the_profile_does_not_list() -> None:
     fastapi = replace(
         get_profile("fastapi"),
-        optional_components=("auth", "auth-api-key", "auth-oidc", "container", "database"),
+        optional_components=(
+            "auth",
+            "auth-api-key",
+            "auth-oidc",
+            "container",
+            "database",
+            "devcontainer",
+        ),
     )
     profiles = tuple(
         fastapi if profile.identifier == "fastapi" else profile for profile in list_profiles()

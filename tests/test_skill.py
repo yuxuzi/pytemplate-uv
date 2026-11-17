@@ -110,6 +110,7 @@ def test_list_json_outputs_parse() -> None:
         "cli",
         "container",
         "database",
+        "devcontainer",
         "mcp",
         "release",
         "worker",

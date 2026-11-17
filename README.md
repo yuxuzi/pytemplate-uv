@@ -37,6 +37,7 @@ ready-to-deploy project.
 | `auth-api-key` | API key authentication with scopes | For service-to-service auth |
 | `auth-oidc` | OpenID Connect (JWT) authentication | For user login via identity provider |
 | `container` | Dockerfile and `.dockerignore` | For containerized deployment |
+| `devcontainer` | A `.devcontainer/devcontainer.json` for VS Code and Codespaces with uv installed | For a one-click development environment |
 | `release` | A trusted-publishing PyPI release workflow triggered by a `v*` tag (`python` and `library` profiles) | To publish a package |
 | `mcp` | An MCP server over stdio, with a typed tool, a test, and `.mcp.json` (`python` and `library` profiles) | To give AI agents tools they can call |
 

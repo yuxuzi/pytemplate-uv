@@ -58,6 +58,8 @@ For `fastapi`, map the user's needs to components and add only what they asked f
 - service-to-service keys: `auth-api-key`; user login through an identity provider:
   `auth-oidc` (choose one; `auth` is added automatically);
 - a Docker image: `container` (also available for `python`);
+- a VS Code or Codespaces development environment: `devcontainer` (also available for `python`
+  and `library`);
 - `auth` is never selected by itself; it comes with `auth-api-key` or `auth-oidc`.
 
 ## 3. Collect inputs

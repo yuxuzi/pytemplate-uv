@@ -17,7 +17,9 @@ from pathlib import Path
 import pytest
 from test_composition import SELECTIONS  # tests/ is on sys.path (rootdir conftest)
 
+from pytemplate.profiles import bundled_catalog
 from pytemplate.rendering import RenderRequest, render
+from pytemplate.resolution import resolve
 
 pytestmark = pytest.mark.skipif(
     os.environ.get("PYTEMPLATE_SMOKE") != "1" or shutil.which("uv") is None,
@@ -27,12 +29,41 @@ pytestmark = pytest.mark.skipif(
 # A long name catches templated lines that only fit the line-length limit for short names.
 PROJECT_NAME = "quantitative-research-market-data-service"
 ONLY_PROFILE = os.environ.get("PYTEMPLATE_SMOKE_PROFILE")
+
+# These components add static files and no dependencies or lifecycle commands, so a set that
+# differs from another only by them runs the same commands on the same code. The smoke test runs
+# the set without them; test_composition still renders every combination.
+STATIC_ONLY = {"devcontainer", "release"}
+
+
+def resolve_ids(profile_id: str, chosen: tuple[str, ...]) -> tuple[str, ...]:
+    """Return the component identifiers a selection resolves to."""
+    return tuple(resolve(bundled_catalog().profile(profile_id), chosen).component_ids)
+
+
+def _smoke_cases() -> list[tuple[str, tuple[str, ...]]]:
+    """Return the selections to run, dropping those that differ only by static-only components."""
+    seen: set[tuple[str, tuple[str, ...]]] = set()
+    cases = []
+    for profile_id, chosen in SELECTIONS:
+        if ONLY_PROFILE not in (None, profile_id):
+            continue
+        key = (
+            profile_id,
+            tuple(c for c in resolve_ids(profile_id, chosen) if c not in STATIC_ONLY),
+        )
+        if key not in seen:
+            seen.add(key)
+            cases.append((profile_id, chosen))
+    return cases
+
+
 TARGET_PYTHON = os.environ.get("PYTEMPLATE_SMOKE_PYTHON")
 
 
 @pytest.mark.parametrize(
     ("profile_id", "chosen"),
-    [case for case in SELECTIONS if ONLY_PROFILE in (None, case[0])],
+    _smoke_cases(),
     ids=lambda value: value if isinstance(value, str) else "+".join(value) or "default",
 )
 def test_generated_project_passes_its_lifecycle_commands(

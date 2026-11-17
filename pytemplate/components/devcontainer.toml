@@ -1,0 +1,12 @@
+contract = 1
+id = "devcontainer"
+name = "Dev container"
+description = "A .devcontainer/devcontainer.json for VS Code and Codespaces: an official Python image with uv installed and the project synced."
+version = "1"
+status = "stable"
+compatible_profiles = ["fastapi", "library", "python"]
+paths = [".devcontainer/devcontainer.json"]
+security_notes = [
+    "The configuration mounts no host credentials and forwards no ports; add those deliberately and never place secrets in devcontainer.json.",
+    "The image is Microsoft's official Python dev container image, one tag per minor version. Microsoft publishes none yet for Python 3.14 or 3.15, so those targets use the 3.13 image and uv downloads the interpreter the project needs during uv sync.",
+]

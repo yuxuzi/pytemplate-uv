@@ -92,6 +92,7 @@ components:
     - cli
     - container
     - database
+    - devcontainer
     - mcp
     - release
     - worker
