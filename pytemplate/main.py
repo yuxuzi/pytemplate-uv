@@ -19,6 +19,17 @@ from pytemplate.agent_skill import (
     install_skill,
     skill_text,
 )
+from pytemplate.cli_options import (
+    ConfigArgument,
+    ForceOption,
+    JsonOption,
+    NameOption,
+    NoInputOption,
+    RequestOptions,
+    TemplateOption,
+    TemplateRefOption,
+    request_options,
+)
 from pytemplate.configuration import ConfigurationError, load_render_request
 from pytemplate.errors import RenderError, RequestError
 from pytemplate.packs import open_catalog
@@ -63,66 +74,6 @@ _REQUEST_ERRORS = (
     ComponentCompatibilityError,
     ManifestError,
 )
-
-JsonOption = Annotated[bool, typer.Option("--json", help="Print machine-readable JSON.")]
-TemplateOption = Annotated[
-    str | None,
-    typer.Option(
-        "--template",
-        "-t",
-        help="External template pack: a directory or git source such as gh:org/repo",
-    ),
-]
-TemplateRefOption = Annotated[
-    str | None,
-    typer.Option("--template-ref", help="Git tag or branch of the --template pack"),
-]
-TemplateCommitOption = Annotated[
-    str | None,
-    typer.Option(
-        "--template-commit",
-        help="Refuse the git pack unless --template-ref resolves to this full commit hash",
-    ),
-]
-TemplateDigestOption = Annotated[
-    str | None,
-    typer.Option(
-        "--template-digest",
-        help="Refuse the git pack unless its files match this SHA-256 digest",
-    ),
-]
-ProfileOption = Annotated[str, typer.Option("--profile", "-p", help="Profile identifier")]
-OutputOption = Annotated[Path, typer.Option("--output-dir", "-o", help="Existing parent directory")]
-NoInputOption = Annotated[
-    bool, typer.Option("--no-input", help="Accept template defaults without prompting")
-]
-ForceOption = Annotated[
-    bool, typer.Option("--force", "-f", help="Allow overwriting an existing output")
-]
-ComponentOption = Annotated[
-    list[str] | None,
-    typer.Option(
-        "--component",
-        "-c",
-        help="Add a compatible component (required components are added automatically); "
-        "repeat for multiple components",
-    ),
-]
-DataOption = Annotated[
-    list[str] | None,
-    typer.Option(
-        "--data",
-        "-d",
-        help="Answer a template question as KEY=VALUE; repeat for multiple answers",
-    ),
-]
-ConfigArgument = Annotated[
-    Path | None,
-    typer.Argument(help="TOML render-request file; when omitted, use the options below"),
-]
-NameOption = Annotated[
-    str, typer.Option("--name", "-n", help="Project slug, when no request file is given")
-]
 
 
 def _echo_json(payload: object) -> None:
@@ -198,50 +149,13 @@ def _root(
     """Generate deterministic Python projects from profiles, components, and template packs."""
 
 
-def _parse_data(pairs: list[str] | None) -> dict[str, str]:
-    """Parse repeated KEY=VALUE options into template answers."""
-    data: dict[str, str] = {}
-    for pair in pairs or ():
-        key, separator, value = pair.partition("=")
-        if not separator or not key:
-            raise ConfigurationError(f"Template data must be KEY=VALUE, got '{pair}'.")
-        data[key] = value
-    return data
-
-
 def _request(
-    *,
-    config: Path | None,
-    project_name: str,
-    profile: str,
-    output_dir: Path,
-    components: list[str] | None,
-    data: list[str] | None,
-    template: str | None,
-    template_ref: str | None,
-    template_commit: str | None = None,
-    template_digest: str | None = None,
-    no_input: bool = True,
-    overwrite: bool = False,
-    dry_run: bool = False,
+    config: Path | None, project_name: str, opts: RequestOptions, **flags: bool
 ) -> RenderRequest:
     """Build a request from a TOML file or from command-line options."""
     if config is not None:
-        return load_render_request(config, dry_run=dry_run)
-    return RenderRequest(
-        profile_id=profile,
-        project_name=project_name,
-        output_dir=output_dir,
-        components=tuple(components or ()),
-        no_input=no_input,
-        overwrite=overwrite,
-        dry_run=dry_run,
-        data=_parse_data(data),
-        template=template,
-        template_ref=template_ref,
-        template_commit=template_commit,
-        template_digest=template_digest,
-    )
+        return load_render_request(config, dry_run=flags.get("dry_run", False))
+    return opts.build(project_name, **flags)
 
 
 def _render_and_report(build: Callable[[], RenderRequest], as_json: bool) -> None:
@@ -274,42 +188,22 @@ def _render_and_report(build: Callable[[], RenderRequest], as_json: bool) -> Non
 
 
 @app.command("create")
+@request_options
 def create(
     project_name: Annotated[
         str, typer.Argument(help="Lowercase project slug, for example: market-data-api")
     ],
-    profile: ProfileOption = "python",
-    output_dir: OutputOption = Path("."),
+    opts: RequestOptions,
+    as_json: bool,
     no_input: NoInputOption = False,
     force: ForceOption = False,
     dry_run: Annotated[
         bool, typer.Option("--dry-run", help="Validate and show the target without writing files")
     ] = False,
-    component: ComponentOption = None,
-    data: DataOption = None,
-    template: TemplateOption = None,
-    template_ref: TemplateRefOption = None,
-    template_commit: TemplateCommitOption = None,
-    template_digest: TemplateDigestOption = None,
-    as_json: JsonOption = False,
 ) -> None:
     """Create a project from a bundled profile or a template pack."""
     _render_and_report(
-        lambda: _request(
-            config=None,
-            project_name=project_name,
-            profile=profile,
-            output_dir=output_dir,
-            components=component,
-            data=data,
-            template=template,
-            template_ref=template_ref,
-            template_commit=template_commit,
-            template_digest=template_digest,
-            no_input=no_input,
-            overwrite=force,
-            dry_run=dry_run,
-        ),
+        lambda: opts.build(project_name, no_input=no_input, overwrite=force, dry_run=dry_run),
         as_json,
     )
 
@@ -507,34 +401,16 @@ def _plan_dict(result: RenderPlan) -> dict[str, object]:
 
 
 @app.command("validate")
+@request_options
 def validate_config(
+    opts: RequestOptions,
+    as_json: bool,
     config: ConfigArgument = None,
     project_name: NameOption = "my-project",
-    profile: ProfileOption = "python",
-    output_dir: OutputOption = Path("."),
-    component: ComponentOption = None,
-    data: DataOption = None,
-    template: TemplateOption = None,
-    template_ref: TemplateRefOption = None,
-    template_commit: TemplateCommitOption = None,
-    template_digest: TemplateDigestOption = None,
-    as_json: JsonOption = False,
 ) -> None:
     """Validate a render request, including template answers, without writing the project."""
     try:
-        request = _request(
-            config=config,
-            project_name=project_name,
-            profile=profile,
-            output_dir=output_dir,
-            components=component,
-            data=data,
-            template=template,
-            template_ref=template_ref,
-            template_commit=template_commit,
-            template_digest=template_digest,
-            dry_run=True,
-        )
+        request = _request(config, project_name, opts, dry_run=True)
         resolution, project_path = validate_request(request)
         planned = plan(request)
     except (*_REQUEST_ERRORS, RenderError) as error:
@@ -551,35 +427,16 @@ def validate_config(
 
 
 @app.command("plan")
+@request_options
 def plan_command(
+    opts: RequestOptions,
+    as_json: bool,
     config: ConfigArgument = None,
     project_name: NameOption = "my-project",
-    profile: ProfileOption = "python",
-    output_dir: OutputOption = Path("."),
-    component: ComponentOption = None,
-    data: DataOption = None,
-    template: TemplateOption = None,
-    template_ref: TemplateRefOption = None,
-    template_commit: TemplateCommitOption = None,
-    template_digest: TemplateDigestOption = None,
-    as_json: JsonOption = False,
 ) -> None:
     """Show the resolved components, dependencies, and exact files, without writing anything."""
     try:
-        result = plan(
-            _request(
-                config=config,
-                project_name=project_name,
-                profile=profile,
-                output_dir=output_dir,
-                components=component,
-                data=data,
-                template=template,
-                template_ref=template_ref,
-                template_commit=template_commit,
-                template_digest=template_digest,
-            )
-        )
+        result = plan(_request(config, project_name, opts))
     except (*_REQUEST_ERRORS, RenderError) as error:
         _fail(error, as_json)
     if as_json:
