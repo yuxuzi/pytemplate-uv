@@ -43,6 +43,13 @@ TemplateDigestOption = Annotated[
         help="Refuse the git pack unless its files match this SHA-256 digest",
     ),
 ]
+NoCacheOption = Annotated[
+    bool,
+    typer.Option(
+        "--no-cache",
+        help="Fetch a pinned git pack again instead of using the local cache",
+    ),
+]
 
 
 def _bundled_choices(ctx: typer.Context, kind: str, incomplete: str) -> list[tuple[str, str]]:
@@ -125,6 +132,7 @@ class RequestOptions:
     template_ref: str | None
     template_commit: str | None
     template_digest: str | None
+    no_cache: bool = False
 
     def build(
         self,
@@ -148,6 +156,7 @@ class RequestOptions:
             template_ref=self.template_ref,
             template_commit=self.template_commit,
             template_digest=self.template_digest,
+            use_cache=not self.no_cache,
         )
 
 
@@ -162,6 +171,7 @@ _SHARED_PARAMETERS: dict[str, tuple[object, object]] = {
     "template_ref": (TemplateRefOption, None),
     "template_commit": (TemplateCommitOption, None),
     "template_digest": (TemplateDigestOption, None),
+    "no_cache": (NoCacheOption, False),
     "as_json": (JsonOption, False),
 }
 
