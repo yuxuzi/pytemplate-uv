@@ -35,6 +35,7 @@ Homepage = "https://github.com/yuxuzi/pytemplate-uv"
 Repository = "https://github.com/yuxuzi/pytemplate-uv"
 Issues = "https://github.com/yuxuzi/pytemplate-uv/issues"
 Changelog = "https://github.com/yuxuzi/pytemplate-uv/blob/main/CHANGELOG.md"
+Documentation = "https://yuxuzi.github.io/pytemplate-uv/"
 
 [project.scripts]
 pytemplate = "pytemplate.main:app"
