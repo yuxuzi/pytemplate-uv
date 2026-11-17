@@ -56,6 +56,7 @@ from pytemplate.rendering import (
 )
 from pytemplate.resolution import Resolution
 from pytemplate.schema import SCHEMAS
+from pytemplate.status import project_status
 from pytemplate.suggestions import did_you_mean
 
 app = typer.Typer(
@@ -517,6 +518,36 @@ def plan_command(
     console.print(f"Files ({len(result.files)}):")
     for name in result.files:
         console.print(f"  {name}", markup=False)
+
+
+@app.command("status")
+def status_command(
+    path: Annotated[
+        Path, typer.Argument(help="Generated project to inspect (default: current directory)")
+    ] = Path("."),
+    as_json: JsonOption = False,
+) -> None:
+    """List files changed, deleted, or added since the project was generated (read-only)."""
+    try:
+        report = project_status(path)
+    except _REQUEST_ERRORS as error:
+        _fail(error, as_json)
+    if as_json:
+        _echo_json(report.as_dict())
+        return
+    if report.clean:
+        console.print(f"[green]No changes[/] since generation in {report.project_path}")
+        return
+    console.print(f"Changes since generation in {report.project_path}:")
+    for label, names in (
+        ("Changed", report.changed),
+        ("Deleted", report.deleted),
+        ("Added", report.added),
+    ):
+        if names:
+            console.print(f"{label} ({len(names)}):")
+            for name in names:
+                console.print(f"  {name}", markup=False)
 
 
 @app.command("schema")
