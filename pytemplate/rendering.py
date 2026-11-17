@@ -307,7 +307,7 @@ def write_generation_manifest(
         ]
     lines += ["", "[answers]", *(f"{key} = {_toml(value)}" for key, value in answers.items())]
     for path in sorted(files):
-        if path.is_file() and path.name != MANIFEST_FILE:
+        if path.name != MANIFEST_FILE:
             relative = path.relative_to(project_path).as_posix()
             digest = hashlib.sha256(path.read_bytes()).hexdigest()
             lines += [
@@ -403,6 +403,7 @@ def _render_into(
     """Render with Copier into ``destination`` and write the answers and manifest files."""
     from copier.errors import CopierError
 
+    exclusions = resolution.exclude_patterns(_package_name(request))
     try:
         run_copy(
             str(template_path),
@@ -411,7 +412,7 @@ def _render_into(
             defaults=request.no_input,
             quiet=True,
             unsafe=False,
-            exclude=resolution.exclude_patterns(_package_name(request)),
+            exclude=exclusions,
         )
     except ValueError as error:
         raise RequestError(
@@ -428,7 +429,7 @@ def _render_into(
             "`{{ _copier_answers|to_nice_yaml }}` to its template."
         )
     _record_template_source(destination, source.location, source.ref)
-    remove_excluded_directories(destination, resolution.exclude_patterns(_package_name(request)))
+    remove_excluded_directories(destination, exclusions)
     return write_generation_manifest(destination, resolution, source)
 
 

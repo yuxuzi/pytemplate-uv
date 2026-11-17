@@ -309,3 +309,9 @@ def test_dry_run_runs_the_answer_validators_and_writes_nothing(tmp_path: Path) -
     result = render(valid)
     assert result.dry_run and result.manifest_path is None
     assert list(tmp_path.iterdir()) == []
+
+
+def test_package_exposes_the_generator_version() -> None:
+    import pytemplate
+
+    assert pytemplate.__version__ == generator_version()
