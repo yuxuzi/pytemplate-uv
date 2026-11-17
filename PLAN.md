@@ -75,77 +75,77 @@ small (2,600 lines), layered, and well tested. The findings below were reproduce
 
 ### Phase 1: command-line experience (PR 1)
 
-- [ ] 1. `-y`/`--yes` on `create` and `create-project`; `--no-input` hidden and deprecated with
+- [x] 1. `-y`/`--yes` on `create` and `create-project`; `--no-input` hidden and deprecated with
        a stderr warning. Tests for both spellings and the warning. (U2)
-- [ ] 2. Refuse to prompt without a TTY (exit 1, actionable message); `--json` implies `--yes`.
+- [x] 2. Refuse to prompt without a TTY (exit 1, actionable message); `--json` implies `--yes`.
        (U1, U7)
-- [ ] 3. Errors and warnings on stderr through one `Console(stderr=True, soft_wrap=True)`; JSON
+- [x] 3. Errors and warnings on stderr through one `Console(stderr=True, soft_wrap=True)`; JSON
        stays on stdout. (U3)
-- [ ] 4. "Did you mean" suggestions with `difflib.get_close_matches` for profiles, components,
+- [x] 4. "Did you mean" suggestions with `difflib.get_close_matches` for profiles, components,
        schemas, and `--data` keys. (U4)
-- [ ] 5. Next steps after `create`: `cd`, then the profile's lifecycle commands. Human output
+- [x] 5. Next steps after `create`: `cd`, then the profile's lifecycle commands. Human output
        only; JSON already carries `lifecycle_commands`. (U5)
-- [ ] 6. Shell completion of profile and component identifiers from the bundled catalog. (U8)
-- [ ] 7. README, skill (`SKILL.md`), CONTRIBUTING, CI workflow, and CHANGELOG use `-y`.
+- [x] 6. Shell completion of profile and component identifiers from the bundled catalog. (U8)
+- [x] 7. README, skill (`SKILL.md`), CONTRIBUTING, CI workflow, and CHANGELOG use `-y`.
        `tests/test_skill.py` still passes.
 
 ### Phase 2: core and performance (PR 2)
 
-- [ ] 8. Import Copier and PyYAML lazily, inside the functions that render; add a test that
+- [x] 8. Import Copier and PyYAML lazily, inside the functions that render; add a test that
        `import pytemplate.main` does not import `copier`. Target: `--help` under 150 ms. (C1)
-- [ ] 9. One pass for `validate`: `plan()` already validates, so add the target check to it and
+- [x] 9. One pass for `validate`: `plan()` already validates, so add the target check to it and
        drop the second catalog open. (C2)
-- [ ] 10. `create --dry-run` runs the same checks as `validate`, answers included. (C3)
-- [ ] 11. Git hardening: `GIT_TERMINAL_PROMPT=0`, a timeout (default 120 s), and an error that
+- [x] 10. `create --dry-run` runs the same checks as `validate`, answers included. (C3)
+- [x] 11. Git hardening: `GIT_TERMINAL_PROMPT=0`, a timeout (default 120 s), and an error that
         names the URL and the cause. (C4)
-- [ ] 12. Accept a full commit hash as `--template-ref` (`git init` + `fetch --depth 1 origin
+- [x] 12. Accept a full commit hash as `--template-ref` (`git init` + `fetch --depth 1 origin
         <sha>`). (C5)
-- [ ] 13. One request-error hierarchy: the profile, component, manifest, and configuration errors
+- [x] 13. One request-error hierarchy: the profile, component, manifest, and configuration errors
         also subclass `RequestError` (keeping `ValueError` for compatibility). The CLI and API
         catch one type. (C7)
-- [ ] 14. Shared request options in `main.py` (one options object built once per command),
+- [x] 14. Shared request options in `main.py` (one options object built once per command),
         without changing any option name or default. (C8)
-- [ ] 15. Parse pack YAML (with includes) for unsafe settings instead of a regex. (C9)
-- [ ] 16. Small cleanups and `pytemplate.__version__`. (C10)
+- [x] 15. Parse pack YAML (with includes) for unsafe settings instead of a regex. (C9)
+- [x] 16. Small cleanups and `pytemplate.__version__`. (C10)
 
 ### Phase 3: package and community (PR 3; workflow edits need approval)
 
-- [ ] 17. A CI job that runs the unit tests with `uv sync --resolution lowest-direct`, and raise
+- [x] 17. A CI job that runs the unit tests with `uv sync --resolution lowest-direct`, and raise
         any lower bound that fails. (P1)
-- [ ] 18. SHA-pin this repository's Actions, add zizmor to CI, and Dependabot for Actions. (P2;
+- [x] 18. SHA-pin this repository's Actions, add zizmor to CI, and Dependabot for Actions. (P2;
         CI edit)
-- [ ] 19. PEP 740 attestations on release. (P3; release-workflow edit)
-- [ ] 20. README badges (PyPI version, Python versions, CI, licence), a `Documentation` URL, a
+- [x] 19. PEP 740 attestations on release. (P3; release-workflow edit)
+- [x] 20. README badges (PyPI version, Python versions, CI, licence), a `Documentation` URL, a
         `SECURITY.md`, and issue templates for bugs and template requests. (P4, P5)
-- [ ] 21. A docs site generated from the existing Markdown (MkDocs Material or Zensical) on
+- [x] 21. A docs site generated from the existing Markdown (MkDocs Material or Zensical) on
         GitHub Pages. (P4; dev dependency and a Pages workflow)
-- [ ] 22. Classifier `5 - Production/Stable`. (P6)
+- [x] 22. Classifier `5 - Production/Stable`. (P6)
 
 ### Phase 4: features (one PR each)
 
-- [ ] 23. `library` profile: a package with tests and tooling but no CLI, `kind = "library"`. One
+- [x] 23. `library` profile: a package with tests and tooling but no CLI, `kind = "library"`. One
         combination per optional component. (U9)
-- [ ] 24. Interactive component picker when `create` runs in a terminal with no `-c`: a
+- [x] 24. Interactive component picker when `create` runs in a terminal with no `-c`: a
         multi-select of the profile's optional components, with `requires` added and
         `conflicts` refused as now. Needs `questionary` as a direct dependency (Copier already
         installs it). (U6)
-- [ ] 25. `pytemplate status [PATH]`: read `.pytemplate.toml` and list generated files that were
+- [x] 25. `pytemplate status [PATH]`: read `.pytemplate.toml` and list generated files that were
         changed, deleted, or added since generation. Read-only; it never merges or rewrites, so
         it does not reopen the 3.1.0 decision on `update`.
-- [ ] 26. Opt-in `--git` and `--lock` on `create`.
-- [ ] 27. `release` component for `python` and `library`: a trusted-publishing release
+- [x] 26. Opt-in `--git` and `--lock` on `create`.
+- [x] 27. `release` component for `python` and `library`: a trusted-publishing release
         workflow with a tag-equals-version check, like this repository's own.
-- [ ] 28. `devcontainer` component (already a 3.1 candidate).
-- [ ] 29. SHA-pinned Actions and a dependency cooldown (`exclude-newer`) in generated CI. Needs
+- [x] 28. `devcontainer` component (already a 3.1 candidate).
+- [x] 29. SHA-pinned Actions and a dependency cooldown (`exclude-newer`) in generated CI. Needs
         a way to keep the pins current, since `update` is gone: Dependabot config in the
         generated project is the likely answer.
-- [ ] 31. Cache git packs pinned to a commit and a digest, keyed by both, under the user cache
+- [x] 31. Cache git packs pinned to a commit and a digest, keyed by both, under the user cache
         directory; `--no-cache` to bypass. Needs `platformdirs` or a small cache-path
         function. (C6)
 
 ### Release
 
-- [ ] 32. CHANGELOG, version 3.2.0, `uv.lock`, and the hub's commands updated to `-y` after
+- [ ] 32. CHANGELOG (done), version 3.2.0, `uv.lock`, and the hub's commands updated to `-y` after
         release.
 - [ ] 33. Maintainer only: confirm CI is green on all runners, then tag `v3.2.0`.
 
