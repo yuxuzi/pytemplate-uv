@@ -24,6 +24,7 @@ from pytemplate.errors import RenderError, RequestError
 from pytemplate.packs import TemplateSource, open_catalog
 from pytemplate.profiles import Catalog, Component, Profile
 from pytemplate.resolution import Resolution, resolve
+from pytemplate.suggestions import closest
 
 __all__ = [
     "ANSWERS_FILE",
@@ -197,8 +198,13 @@ def _validate(request: RenderRequest, catalog: Catalog) -> tuple[Resolution, Pat
     unknown = sorted(set(request.data) - set(supported))
     if "project_name" in request.data or unknown:
         rejected = ", ".join(unknown) if unknown else "project_name"
+        hints = "".join(
+            f" Did you mean '{match}' instead of '{key}'?"
+            for key in unknown
+            if (match := closest(key, supported))
+        )
         raise RequestError(
-            f"Unsupported template data for profile '{profile.identifier}': {rejected}. "
+            f"Unsupported template data for profile '{profile.identifier}': {rejected}.{hints} "
             f"Supported keys: {', '.join(q for q in supported if q != 'project_name')}."
         )
     output_dir = request.output_dir.expanduser().resolve()

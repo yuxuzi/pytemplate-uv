@@ -17,6 +17,7 @@ from pytemplate.profiles import (
     Setting,
     list_components,
 )
+from pytemplate.suggestions import did_you_mean
 
 
 @dataclass(frozen=True)
@@ -93,7 +94,8 @@ def _selectable(
     component = catalog.get(identifier)
     if component is None:
         raise ComponentNotFoundError(
-            f"Unknown component '{identifier}'. Available components: {', '.join(sorted(catalog))}."
+            f"Unknown component '{identifier}'.{did_you_mean(identifier, catalog)} "
+            f"Available components: {', '.join(sorted(catalog))}."
         )
     if identifier not in profile.components:
         raise ComponentCompatibilityError(

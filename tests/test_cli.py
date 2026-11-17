@@ -416,3 +416,28 @@ def test_errors_go_to_stderr_and_json_stays_on_stdout(tmp_path: Path) -> None:
     assert schema.exit_code == 1
     assert schema.stdout == ""
     assert "Unknown schema" in schema.stderr
+
+
+def test_unknown_identifiers_get_suggestions(tmp_path: Path) -> None:
+    component = runner.invoke(
+        app, ["plan", "-p", "fastapi", "-c", "datbase", "-o", str(tmp_path), "--name", "x"]
+    )
+    profile = runner.invoke(app, ["plan", "-p", "fastap", "-o", str(tmp_path), "--name", "x"])
+    described = runner.invoke(app, ["describe-component", "datbase"])
+    schema = runner.invoke(app, ["schema", "manifst"])
+    data = runner.invoke(app, ["plan", "-o", str(tmp_path), "--name", "x", "-d", "packge_name=y"])
+
+    assert "Did you mean 'database'?" in component.stderr
+    assert "Available components:" in component.stderr
+    assert "Did you mean 'fastapi'?" in profile.stderr
+    assert "Available profiles:" in profile.stderr
+    assert "Did you mean 'database'?" in described.stderr
+    assert "Did you mean 'manifest'?" in schema.stderr
+    assert "Did you mean 'package_name' instead of 'packge_name'?" in data.stderr
+
+
+def test_nothing_close_gives_no_suggestion(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["plan", "-p", "zzzzzz", "-o", str(tmp_path), "--name", "x"])
+
+    assert "Did you mean" not in result.stderr
+    assert "Available profiles:" in result.stderr
