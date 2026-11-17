@@ -1,16 +1,17 @@
 """Black-box tests for the public command-line interface."""
 
+import dataclasses
 import json
 from pathlib import Path
 from typing import Any
 
 import pytest
-from typer.testing import CliRunner
+from cli_runner import make_runner
 
 import pytemplate.rendering as rendering
 from pytemplate.main import app, create_project_app
 
-runner = CliRunner()
+runner = make_runner()
 
 
 def test_help_describes_the_public_commands() -> None:
@@ -542,7 +543,8 @@ def _interactive(
 
     def capture(request: rendering.RenderRequest) -> rendering.RenderResult:
         requests.append(request)
-        return real(request)
+        # A dry run renders through Copier, which would prompt; the picker is under test here.
+        return real(dataclasses.replace(request, no_input=True))
 
     monkeypatch.setattr("pytemplate.main.render", capture)
     return seen, requests

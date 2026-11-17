@@ -6,13 +6,13 @@ from pathlib import Path
 
 import pytest
 import yaml
-from typer.testing import CliRunner
+from cli_runner import make_runner
 
 from pytemplate.agent_skill import skill_text
 from pytemplate.main import app
 from pytemplate.profiles import bundled_catalog
 
-runner = CliRunner()
+runner = make_runner()
 
 
 def _frontmatter(text: str) -> dict[str, str]:

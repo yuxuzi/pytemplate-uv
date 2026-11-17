@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from typer.testing import CliRunner
+from cli_runner import make_runner
 
 from pytemplate import api
 from pytemplate.configuration import _ALLOWED_KEYS
@@ -15,7 +15,7 @@ from pytemplate.packs import _PACK_KEYS
 from pytemplate.profiles import _COMPONENT_KEYS, _PROFILE_KEYS, _SETTING_KEYS
 from pytemplate.schema import SCHEMAS
 
-runner = CliRunner()
+runner = make_runner()
 
 
 @pytest.mark.parametrize(

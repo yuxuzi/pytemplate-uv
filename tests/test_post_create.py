@@ -6,12 +6,12 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from typer.testing import CliRunner
+from cli_runner import make_runner
 
 from pytemplate import post_create
 from pytemplate.main import app
 
-runner = CliRunner()
+runner = make_runner()
 
 
 class Recorder:

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 import yaml
-from typer.testing import CliRunner
+from cli_runner import make_runner
 
 from pytemplate import packs
 from pytemplate.configuration import load_render_request
@@ -18,7 +18,7 @@ from pytemplate.main import app
 from pytemplate.packs import is_git_source, open_catalog, pack_digest
 from pytemplate.rendering import RenderRequest, plan, render
 
-runner = CliRunner()
+runner = make_runner()
 
 
 def _request(pack: Path | str, output: Path, **kwargs: object) -> RenderRequest:

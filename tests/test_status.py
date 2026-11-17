@@ -4,12 +4,12 @@ import json
 from pathlib import Path
 
 import pytest
-from typer.testing import CliRunner
+from cli_runner import make_runner
 
 from pytemplate.main import app
 from pytemplate.status import StatusError, project_status
 
-runner = CliRunner()
+runner = make_runner()
 
 
 @pytest.fixture

@@ -12,7 +12,6 @@ from importlib.resources.abc import Traversable
 from typing import Any
 
 from pytemplate.errors import RequestError
-
 from pytemplate.suggestions import did_you_mean
 
 CONTRACT_VERSION = 1
