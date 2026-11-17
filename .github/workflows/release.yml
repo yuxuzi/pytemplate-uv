@@ -45,7 +45,8 @@ jobs:
         with:
           name: dist
           path: dist/
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      # `uv publish` only uploads attestations that already exist; this action also generates
+      # PEP 740 attestations (the default with Trusted Publishing).
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
-          enable-cache: false
-      - run: uv publish --trusted-publishing always dist/*
+          attestations: true
