@@ -441,6 +441,23 @@ def _source(request: RenderRequest, opened: TemplateSource) -> TemplateSource:
     return TemplateSource(kind=opened.kind, location=DEFAULT_TEMPLATE_SOURCE, ref=ref)
 
 
+def _trial_render(
+    request: RenderRequest, resolution: Resolution, source: TemplateSource, root: Path
+) -> tuple[str, ...]:
+    """Render into a temporary directory, so every check runs, and return the file list."""
+    with tempfile.TemporaryDirectory(prefix="pytemplate-plan-") as scratch:
+        staged = Path(scratch) / request.project_name
+        try:
+            _render_into(staged, request, resolution, source, root)
+        except OSError as error:
+            raise RenderError(f"Could not render the plan: {error}") from error
+        return tuple(
+            sorted(
+                path.relative_to(staged).as_posix() for path in staged.rglob("*") if path.is_file()
+            )
+        )
+
+
 def plan(request: RenderRequest) -> RenderPlan:
     """Resolve a request and list the files it would generate, without touching the target.
 
@@ -449,19 +466,7 @@ def plan(request: RenderRequest) -> RenderPlan:
     with _open_request_catalog(request) as (catalog, opened, root):
         resolution, project_path = _validate(request, catalog)
         source = _source(request, opened)
-        with tempfile.TemporaryDirectory(prefix="pytemplate-plan-") as scratch:
-            staged = Path(scratch) / request.project_name
-            try:
-                _render_into(staged, request, resolution, source, root)
-            except OSError as error:
-                raise RenderError(f"Could not render the plan: {error}") from error
-            files = tuple(
-                sorted(
-                    path.relative_to(staged).as_posix()
-                    for path in staged.rglob("*")
-                    if path.is_file()
-                )
-            )
+        files = _trial_render(request, resolution, source, root)
     return RenderPlan(
         resolution=resolution,
         project_path=project_path,
@@ -479,6 +484,8 @@ def render(request: RenderRequest) -> RenderResult:
         _check_target(request, project_path)
         source = _source(request, opened)
         if request.dry_run:
+            # Same checks as `plan`, Copier's answer validators included; nothing is written.
+            _trial_render(request, resolution, source, root)
             return RenderResult(
                 resolution=resolution, project_path=project_path, dry_run=True, source=source
             )

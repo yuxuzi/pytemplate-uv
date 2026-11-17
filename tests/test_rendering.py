@@ -288,3 +288,24 @@ def test_importing_the_cli_does_not_import_copier() -> None:
 
     code = "import pytemplate.main, sys; assert 'copier' not in sys.modules"
     subprocess.run([sys.executable, "-c", code], check=True)
+
+
+def test_dry_run_runs_the_answer_validators_and_writes_nothing(tmp_path: Path) -> None:
+    request = RenderRequest(
+        profile_id="python",
+        project_name="demo",
+        output_dir=tmp_path,
+        no_input=True,
+        dry_run=True,
+        data={"description": 'Say "hi"'},
+    )
+    with pytest.raises(RequestError, match="Copier rejected the answers"):
+        render(request)
+    assert list(tmp_path.iterdir()) == []
+
+    valid = RenderRequest(
+        profile_id="python", project_name="demo", output_dir=tmp_path, no_input=True, dry_run=True
+    )
+    result = render(valid)
+    assert result.dry_run and result.manifest_path is None
+    assert list(tmp_path.iterdir()) == []
