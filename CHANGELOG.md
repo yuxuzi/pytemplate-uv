@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## [3.3.0] — 2026-11-24
+
+3.3.0 connects pytemplate-uv to pytemplate-hub, the index of template packs: the skill can find a
+pack there, and the README shows where to find and share packs.
+
+### Added
+
+- The `pytemplate` skill can look for a template pack on
+  [pytemplate-hub](https://github.com/yuxuzi/pytemplate-hub) when the user asks for one or no
+  bundled profile fits. It shows the candidates and whether each is listed or reviewed, waits for
+  the user's choice, and pins the request to the listed commit and digest. Reinstall the skill with
+  `pytemplate skill install --force`.
+
 ### Documentation
 
 - The README names [pytemplate-hub](https://github.com/yuxuzi/pytemplate-hub) as the place to
