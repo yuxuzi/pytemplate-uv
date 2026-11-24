@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Documentation
+
+- The README names [pytemplate-hub](https://github.com/yuxuzi/pytemplate-hub) as the place to
+  find and share template packs, shows a pinned command from a listing, and links the hub's
+  tutorial.
+
 ## [3.2.0] — 2026-11-17
 
 3.2.0 makes the CLI friendlier and faster, adds a `library` profile with `release` and
