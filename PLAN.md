@@ -146,8 +146,9 @@ small (2,600 lines), layered, and well tested. The findings below were reproduce
 ### Release
 
 - [x] 32. CHANGELOG, version 3.2.0, and `uv.lock`.
-- [ ] 32a. After release: the hub's generated commands use `-y`.
-- [ ] 33. Maintainer only: confirm CI is green on all runners, then tag `v3.2.0`.
+- [x] 32a. After release: the hub's generated commands use `-y` (pytemplate-hub PR #12).
+- [x] 33. Maintainer only: confirm CI is green on all runners, then tag `v3.2.0` (released to
+       PyPI 2026-11-17).
 
 ## 4. Acceptance criteria
 
