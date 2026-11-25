@@ -11,7 +11,8 @@ import re
 import tomllib
 import urllib.error
 import urllib.request
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from typing import Any
 
 from pytemplate.errors import RequestError
@@ -42,6 +43,7 @@ class HubPin:
     commit: str
     digest: str
     reviewed_by: str | None = None
+    profile_lifecycles: Mapping[str, str] = field(default_factory=dict)
 
     @property
     def location(self) -> str:
@@ -181,7 +183,22 @@ def lookup_hub(spec: str) -> HubPin:
         commit=version["commit"],
         digest=version["digest"],
         reviewed_by=reviewed if isinstance(reviewed, str) else None,
+        profile_lifecycles=_lifecycles(version),
     )
+
+
+def _lifecycles(version: dict[str, Any]) -> dict[str, str]:
+    """Return each profile's lifecycle result (``passed`` or ``not-run``) from the entry."""
+    profiles = version.get("profiles", [])
+    if not isinstance(profiles, list):
+        return {}
+    return {
+        item["id"]: item["lifecycle"]
+        for item in profiles
+        if isinstance(item, dict)
+        and isinstance(item.get("id"), str)
+        and isinstance(item.get("lifecycle"), str)
+    }
 
 
 def pin_for(

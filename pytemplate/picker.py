@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 from pytemplate.errors import RequestError
 from pytemplate.profiles import Component, Profile
@@ -41,3 +41,32 @@ def choose_components(profile: Profile, components: Mapping[str, Component]) -> 
     if answer is None:
         raise PickerCancelledError("Cancelled; nothing was created.")
     return [str(identifier) for identifier in answer]
+
+
+def choose_profile(profiles: Sequence[Profile], checks: Mapping[str, str] | None = None) -> str:
+    """Ask which profile to create; ``python`` is listed first when there is one.
+
+    ``checks`` maps a profile to its lifecycle result on a hub entry (``passed`` or ``not-run``),
+    shown beside it. Ctrl-C raises ``PickerCancelledError``.
+    """
+    import questionary  # imported here: only an interactive create needs it
+
+    checks = checks or {}
+    ordered = sorted(profiles, key=lambda profile: profile.identifier != "python")
+    choices = [
+        questionary.Choice(
+            f"{profile.identifier} - {profile.description}{_check_label(checks, profile)}",
+            value=profile.identifier,
+        )
+        for profile in ordered
+    ]
+    answer = questionary.select("Project profile", choices=choices).ask()
+    if answer is None:
+        raise PickerCancelledError("Cancelled; nothing was created.")
+    return str(answer)
+
+
+def _check_label(checks: Mapping[str, str], profile: Profile) -> str:
+    if profile.identifier not in checks:
+        return ""
+    return " (checks passed)" if checks[profile.identifier] == "passed" else " (checks not run)"

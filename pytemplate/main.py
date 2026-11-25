@@ -41,9 +41,9 @@ from pytemplate.cli_options import (
 )
 from pytemplate.configuration import ConfigurationError, load_render_request
 from pytemplate.errors import RenderError, RequestError
-from pytemplate.hub import pin_for
+from pytemplate.hub import HubPin, pin_for
 from pytemplate.packs import open_catalog
-from pytemplate.picker import choose_components
+from pytemplate.picker import choose_components, choose_profile
 from pytemplate.post_create import run_post_steps
 from pytemplate.profiles import (
     Catalog,
@@ -201,13 +201,15 @@ def _with_picked_components(opts: RequestOptions, as_json: bool) -> RequestOptio
             digest=opts.template_digest,
             use_cache=not opts.no_cache,
         ) as (catalog, _, _):
+            if opts.profile is None:
+                raise RequestError("--profile must be chosen before its components are offered.")
             chosen = choose_components(catalog.profile(opts.profile), catalog.component_map())
     except (*_REQUEST_ERRORS, RenderError) as error:
         _fail(error, as_json)
     return replace(opts, component=chosen or None)
 
 
-def _resolved(opts: RequestOptions, as_json: bool) -> RequestOptions:
+def _resolved(opts: RequestOptions, as_json: bool) -> tuple[RequestOptions, HubPin | None]:
     """Resolve `--hub` to its pins, announce the pin on stderr, and return the pinned options."""
     try:
         resolved, pin = opts.resolved()
@@ -215,7 +217,38 @@ def _resolved(opts: RequestOptions, as_json: bool) -> RequestOptions:
         _fail(error, as_json)
     if pin is not None:
         err_console.print(pin.notice, markup=False)
-    return resolved
+    return resolved, pin
+
+
+def _with_profile(
+    opts: RequestOptions, pin: HubPin | None, as_json: bool, *, ask: bool
+) -> RequestOptions:
+    """Fill in the profile when `-p` is missing.
+
+    A catalog with one profile uses it. Otherwise, when ``ask`` (a terminal without -y), the
+    user chooses; when not, ``python`` is used, or the usual unknown-profile error lists them.
+    """
+    if opts.profile is not None:
+        return opts
+    try:
+        with open_catalog(
+            opts.template,
+            opts.template_ref,
+            commit=opts.template_commit,
+            digest=opts.template_digest,
+            use_cache=not opts.no_cache,
+        ) as (catalog, _, _):
+            profiles = catalog.profiles
+            if len(profiles) == 1:
+                identifier = profiles[0].identifier
+            elif ask and profiles:
+                checks = pin.profile_lifecycles if pin is not None else None
+                identifier = choose_profile(profiles, checks)
+            else:
+                identifier = catalog.profile("python").identifier
+    except (*_REQUEST_ERRORS, RenderError) as error:
+        _fail(error, as_json)
+    return replace(opts, profile=identifier)
 
 
 def _render_and_report(
@@ -293,7 +326,8 @@ def create(
             ),
             as_json,
         )
-    opts = _resolved(opts, as_json)
+    opts, pin = _resolved(opts, as_json)
+    opts = _with_profile(opts, pin, as_json, ask=not unattended)
     if not unattended and not opts.component:
         opts = _with_picked_components(opts, as_json)
     _render_and_report(
@@ -584,7 +618,8 @@ def validate_config(
 ) -> None:
     """Validate a render request, including template answers, without writing the project."""
     if config is None:
-        opts = _resolved(opts, as_json)
+        opts, pin = _resolved(opts, as_json)
+        opts = _with_profile(opts, pin, as_json, ask=False)
     try:
         request = _request(config, project_name, opts, dry_run=True)
         planned = plan(request)
@@ -617,7 +652,8 @@ def plan_command(
 ) -> None:
     """Show the resolved components, dependencies, and exact files, without writing anything."""
     if config is None:
-        opts = _resolved(opts, as_json)
+        opts, pin = _resolved(opts, as_json)
+        opts = _with_profile(opts, pin, as_json, ask=False)
     try:
         result = plan(_request(config, project_name, opts))
     except (*_REQUEST_ERRORS, RenderError) as error:

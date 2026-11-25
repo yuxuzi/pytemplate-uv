@@ -92,7 +92,7 @@ def complete_components(ctx: typer.Context, incomplete: str) -> list[tuple[str, 
 
 
 ProfileOption = Annotated[
-    str,
+    str | None,
     typer.Option("--profile", "-p", help="Profile identifier", autocompletion=complete_profiles),
 ]
 OutputOption = Annotated[Path, typer.Option("--output-dir", "-o", help="Existing parent directory")]
@@ -157,7 +157,7 @@ class HubHelpCommand(TyperCommand):
 class RequestOptions:
     """The request options shared by `create`, `validate`, and `plan`, read once per command."""
 
-    profile: str
+    profile: str | None
     output_dir: Path
     component: list[str] | None
     data: list[str] | None
@@ -201,6 +201,8 @@ class RequestOptions:
         dry_run: bool = False,
     ) -> RenderRequest:
         """Build a request from these options and the per-command flags."""
+        if self.profile is None:
+            raise RequestError("--profile was not chosen before the request was built.")
         if self.hub is not None and self.template_commit is None:
             # Fail closed: an unresolved --hub must never reach the catalog unpinned.
             raise RequestError("--hub was not resolved to its pins before the request was built.")
@@ -225,7 +227,7 @@ class RequestOptions:
 # Parameter name -> (annotation, default). The decorator below appends these to a command so the
 # three request commands declare their twelve shared options once.
 _SHARED_PARAMETERS: dict[str, tuple[object, object]] = {
-    "profile": (ProfileOption, "python"),
+    "profile": (ProfileOption, None),
     "output_dir": (OutputOption, Path(".")),
     "component": (ComponentOption, None),
     "data": (DataOption, None),
