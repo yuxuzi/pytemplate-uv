@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import tomllib
+from collections.abc import Callable
 from pathlib import Path
 
 from pytemplate.errors import RequestError
+from pytemplate.hub import HubPin, pin_for
 from pytemplate.packs import is_git_source
 from pytemplate.rendering import RenderRequest
 
@@ -26,6 +28,7 @@ _ALLOWED_KEYS = {
     "template_ref",
     "template_commit",
     "template_digest",
+    "hub",
 }
 
 
@@ -54,8 +57,40 @@ def _template(data: dict[str, object], base: Path) -> str | None:
     return str(path if path.is_absolute() else base / path)
 
 
-def load_render_request(path: Path, *, dry_run: bool = False) -> RenderRequest:
-    """Load a render request from a TOML file relative to its own directory."""
+def _hub_pins(
+    data: dict[str, object], base: Path, notify: Callable[[str], None] | None
+) -> tuple[HubPin | None, tuple[str | None, str | None, str | None, str | None]]:
+    """Return the pack pins of a request: from ``hub`` when it is set, else as written."""
+    template = _template(data, base)
+    template_ref = _optional_string(data, "template_ref")
+    template_commit = _optional_string(data, "template_commit")
+    template_digest = _optional_string(data, "template_digest")
+    hub = _optional_string(data, "hub")
+    if hub is None:
+        return None, (template, template_ref, template_commit, template_digest)
+    pin = pin_for(
+        hub,
+        template=template,
+        template_ref=template_ref,
+        template_commit=template_commit,
+        template_digest=template_digest,
+    )
+    if notify is not None:
+        notify(pin.notice)
+    return pin, (pin.location, pin.tag, pin.commit, pin.digest)
+
+
+def load_render_request(
+    path: Path,
+    *,
+    dry_run: bool = False,
+    notify: Callable[[str], None] | None = None,
+) -> RenderRequest:
+    """Load a render request from a TOML file relative to its own directory.
+
+    ``hub = "owner/pack@tag"`` resolves the pins through pytemplate-hub, as ``--hub`` does; the
+    resolution is announced through ``notify`` when one is given.
+    """
     config_path = path.expanduser().resolve()
     try:
         data = tomllib.loads(config_path.read_text(encoding="utf-8"))
@@ -90,7 +125,8 @@ def load_render_request(path: Path, *, dry_run: bool = False) -> RenderRequest:
         raise ConfigurationError(
             "Configuration keys 'no_input' and 'overwrite' must be boolean values."
         )
-    template = _template(data, config_path.parent)
+    pin, pins = _hub_pins(data, config_path.parent, notify)
+    template, template_ref, template_commit, template_digest = pins
     return RenderRequest(
         profile_id=profile,
         project_name=project_name,
@@ -101,7 +137,8 @@ def load_render_request(path: Path, *, dry_run: bool = False) -> RenderRequest:
         dry_run=dry_run,
         data=_template_data(data.get("data", {})),
         template=template,
-        template_ref=_optional_string(data, "template_ref"),
-        template_commit=_optional_string(data, "template_commit"),
-        template_digest=_optional_string(data, "template_digest"),
+        template_ref=template_ref,
+        template_commit=template_commit,
+        template_digest=template_digest,
+        hub=pin.pack if pin is not None else None,
     )

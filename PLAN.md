@@ -1,172 +1,148 @@
-# PLAN.md — pytemplate-uv 3.2: a friendlier CLI, a faster core, a stronger package
+# PLAN.md — pytemplate-uv 3.5: a short command for a hub pack
 
-This is the working plan for the next release. The 3.1 plan (agent-ready projects) is finished
-and released to PyPI; its record is in the git history and the 3.1.0 CHANGELOG entry.
+This is the working plan for the next release. The 3.2 plan (a friendlier CLI, a faster core, a
+stronger package) is finished and released; its record is in the git history and the CHANGELOG.
 
 Status key: `[x]` done and verified, `[ ]` open, `[?]` needs the maintainer's decision first.
 
-## 1. Review findings (2026-11-17, on 3.1.0)
+## 1. The problem
 
-Baseline: `uv run pytest` 326 passed, 28 skipped (smoke); ruff and strict mypy clean. The code is
-small (2,600 lines), layered, and well tested. The findings below were reproduced on `main`.
+Creating a project from a pack on pytemplate-hub takes this command, which the hub's site and the
+skill both produce:
 
-### Command-line experience
-
-| # | Finding | Evidence |
-| --- | --- | --- |
-| U1 | `create` without `--no-input` fails outside a terminal, after doing the work, with Copier's own advice (`--defaults`, `--data-file`), which are not pytemplate options. It exits 2 (render failure), although nothing about the request was wrong. | `pytemplate create demo </dev/null` |
-| U2 | There is no short flag for the most common option. Every README example, the skill, and CI spell out `--no-input`. The community convention (uv, npm, pip, apt, `uv init`) is `-y`/`--yes`. | README lines 98-245 |
-| U3 | Errors go to stdout, not stderr, and Rich wraps them at 80 columns, which breaks log parsing and `2>` redirection. | `create Bad_Name ... 2>/dev/null` still prints the error |
-| U4 | Unknown identifiers give the full list but no suggestion. | `-c datbase` lists nine components instead of "did you mean 'database'?" |
-| U5 | After `create`, the user is not told what to do next, though the profile knows its lifecycle commands. | `create` prints two lines |
-| U6 | Interactive mode prompts for text answers but never for components; you must know `-c` names first. | `questions.yml`: `components` is always passed as data |
-| U7 | `--json` with prompting enabled would interleave prompts with JSON. | `create --json` without `--no-input` |
-| U8 | No shell completion of profile and component identifiers. | Typer supports `autocompletion=` |
-| U9 | A pure library cannot be generated: `cli` is a default component of `python`, and defaults cannot be removed. `library` is already a declared profile kind with no profile. | `python/profile.toml` |
-| U10 | Three executables (`pytemplate`, `pytemplate-uv`, `create-project`). `create-project` is a generic name that can shadow another tool on `PATH`. | `[project.scripts]` |
-
-### Code
+```bash
+uvx pytemplate-uv@latest create hello-cli -p cli \
+  --template gh:yuxuzi/pytemplate-starters --template-ref v1.0.0 \
+  --template-commit 2886e570d1b964811e63b6aa93f3e0ede2e8e7d2 \
+  --template-digest 9257161472cfe280e79c7452ff0e01618b278ea57b7d74280b882976969de924 -y
+```
 
 | # | Finding | Evidence |
 | --- | --- | --- |
-| C1 | `import pytemplate.main` takes about 400 ms; Copier is half of it, and `--help`, `--version`, `list-*`, `describe-*`, and `schema` never use it. | `python -X importtime` |
-| C2 | `validate` opens the catalog twice (`validate_request`, then `plan`). For a git pack that is two clones. | `main.py` `validate_config` |
-| C3 | `create --dry-run` checks less than `validate`: it skips Copier's answer validators, so a dry run can pass and the real run fail. | `rendering.render` returns before rendering |
-| C4 | `git clone` runs with no timeout and with credential prompts enabled, so a private or mistyped pack URL can hang an unattended run. | `packs._clone` |
-| C5 | `--template-ref` must be a branch or tag (`clone --branch`); a commit hash cannot be used as the ref, though a commit is the strongest pin. | `packs._clone` |
-| C6 | Every command clones a git pack again, even when it is pinned to a commit and a digest, which are immutable. | `open_catalog` |
-| C7 | Request errors have two hierarchies: `RequestError` and five `ValueError` subclasses, so the CLI keeps a tuple and API users must catch six types. | `main._REQUEST_ERRORS`, `api.py` docstring |
-| C8 | Seven commands repeat the same twelve options and the same `_request(...)` call. | `main.py` is 656 lines |
-| C9 | The unsafe-setting check of a pack is a regex over top-level `*.yml` files; it misses flow-style YAML and `!include`d files. Copier's `unsafe=False` remains the real guard, so this is defence in depth only. | `packs._UNSAFE_SETTINGS` |
-| C10 | Small items: `pytemplate/__init__.py` has a stray comment and no `__version__`; `exclude_patterns()` is computed twice per render; the manifest writer checks `is_file()` twice. | |
+| H1 | Four flags and 104 characters of hash for one pack. Nobody types it; a copy that loses a line fails or, worse, drops the pin. | The command above |
+| H2 | The pins are already on the hub, in `index/<owner>/<pack>.toml`, but the CLI cannot read them, so every caller copies them by hand. | `packs._check_pin` takes them only as flags |
+| H3 | The skill clones the whole hub to read one entry, then builds the long command. | `SKILL.md` step 3 |
+| H4 | Without `-p`, `create` uses `python`. A pack with no `python` profile fails with "Unknown profile 'python'", even in a terminal where it could ask. | `cli_options._SHARED_PARAMETERS`, `profiles.py` |
+| H5 | `-h` is unused: `create -h` says "No such option: -h". | `uvx pytemplate-uv@3.3.0 create -h` |
 
-### Package and community
+## 2. The result
 
-| # | Finding |
+```bash
+uvx pytemplate-uv@latest create hello-cli -h yuxuzi/pytemplate-starters
+```
+
+In a terminal this asks for the profile (H4), then the optional components (as today), and
+creates the project from the commit and digest the hub listed for the pack's latest version. The
+fully pinned command keeps working unchanged, for CI, offline machines, and anyone who does not
+want to trust the hub's index.
+
+## 3. Changes
+
+### U1 `--hub` / `-h`: read the pins from the hub `[x]`
+
+- `-h, --hub OWNER/PACK[@TAG]` on `create`, `validate`, `plan`, `list-profiles`,
+  `describe-profile`, `list-components`, and `describe-component` (the commands that take
+  `--template`), through the shared options in `cli_options.py`.
+- It fetches one file, `index/<owner>/<pack>.toml`, from the hub's `main` branch
+  (`https://raw.githubusercontent.com/yuxuzi/pytemplate-hub/main/index/`) with `urllib` from the
+  standard library: **no new dependency, and no dependency on the hub's website** being deployed.
+  The same timeout as git (`PYTEMPLATE_GIT_TIMEOUT`). `PYTEMPLATE_HUB_URL` replaces the base URL,
+  for a firm's private mirror and for tests.
+- It reads `repository` and the version's `tag`, `commit`, and `digest`, then runs exactly the
+  pinned path that exists today (`_check_pin`, fetch by commit, digest check, cache). The hub is
+  only a lookup; the refusal of a moved tag or changed files is unchanged.
+- No `@TAG`: the newest version that is not yanked. A yanked `@TAG` is refused, naming the newest.
+  An unknown tag lists the listed tags.
+- The entry's `format` must be 1; another value says "upgrade pytemplate-uv".
+- Before rendering, one line on stderr says what was resolved and how far it is trusted:
+  `Using yuxuzi/pytemplate-starters v1.0.0 (commit 2886e57, digest 92571614…), listed on the hub, not reviewed.`
+  `--json` output carries the same fields.
+- `.pytemplate.toml` records the source as today (repository, tag, commit, digest) plus
+  `hub = "yuxuzi/pytemplate-starters"`, so `status` and a rerun know where it came from.
+- Errors, all exit code 2 (invalid request), each with the next step:
+  - `--hub` with `--template`, `--template-ref`, `--template-commit`, or `--template-digest`:
+    "--hub names the pack and its pins; drop --template…".
+  - Not listed (HTTP 404): "'acme/foo' is not listed on pytemplate-hub. Browse the listed packs at
+    <hub URL>, or pass --template for a pack that is not listed."
+  - Network failure: the error, then the fully pinned command is the way to work offline.
+  - A malformed `OWNER/PACK`: the expected shape and an example.
+- `create-from-config` accepts `hub = "owner/pack@tag"` in the request file, with the same rules.
+
+### U2 `-h` with no value shows help `[x]`
+
+`-h` means help almost everywhere, and the decision (D1) is to give it to `--hub` anyway. So that
+the habit still works: `pytemplate create -h` (or `-h` as the last argument, or followed by another
+option) prints the command's help and exits 0, instead of "Option '-h' requires an argument".
+`--help` is unchanged everywhere. The root command and the commands without `--hub` keep `-h`
+unused, so `pytemplate -h` still says "No such option" and suggests `--help`; the README says
+`-h` is `--hub`.
+
+### U3 Ask for the profile when `-p` is missing `[x]`
+
+`-p` defaults to "not given" instead of `python`.
+
+| Situation | Behaviour |
 | --- | --- |
-| P1 | Lower bounds (`rich>=13.7.0`, `typer>=0.12.0`, `copier>=9.4`) are never tested; CI only runs the lock file. |
-| P2 | This repository's own Actions are pinned to tags, not commit SHAs, and nothing scans the workflows (zizmor). |
-| P3 | Releases do not attach PEP 740 attestations; check whether `uv publish` produces them, or use `pypa/gh-action-pypi-publish`, which does by default. |
-| P4 | The README (15 KB) is the only documentation; there is no docs site, no `Documentation` URL, and no badges. |
-| P5 | No `SECURITY.md` for reporting vulnerabilities in the generator, and no issue templates. |
-| P6 | `Development Status :: 4 - Beta` at a third major version with a written compatibility policy. |
+| `-p` given | Unchanged |
+| The catalog (bundled, local folder, git, or hub pack) has one profile | Use it, with no question |
+| No `-p`, in a terminal, no `-y` | A `questionary.select` of the profiles, "id - description", with `python` first when it exists. For a hub pack, each shows its lifecycle result from the index (`checks passed`, `checks failed`). Then the existing component picker |
+| No `-p`, with `-y` or `--json` | `python` if the catalog has it (today's behaviour for the bundled catalog); otherwise today's error, which lists the profiles |
+| No `-p`, no terminal, no `-y` | Today's early error ("standard input is not a terminal") |
 
-## 2. Decisions
+Ctrl-C at the question: "Cancelled; nothing was created.", as the component picker does.
+`validate` and `plan` never ask: they keep the `-y` rule. `questionary` is already a dependency.
 
-- **`-y`/`--yes` replaces `--no-input`.** It becomes the documented spelling everywhere: README,
-  skill, CI, and the hub's generated commands. The compatibility policy (rule 3) requires a
-  deprecation period for CLI options, so `--no-input` keeps working, hidden from `--help`, with
-  a warning on stderr, and is removed in 4.0. The request-file key `no_input` and the API field
-  `RenderRequest.no_input` stay; Quant App Factory uses the API field. If the maintainer wants
-  `--no-input` gone in 3.2, record it as a second exception under rule 3, as 3.1.0 did.
-- **No prompt without a terminal.** When stdin is not a TTY and `--yes` is absent, `create` exits
-  1 before rendering, naming `-y` and `--data KEY=VALUE`. It does not silently accept defaults.
-- **`--json` implies `--yes`.** Machine output never prompts. Agents already pass both.
-- **Determinism is unchanged.** Interactive defaults may read `git config user.name` and
-  `user.email`, because the answers are recorded in `.copier-answers.yml`; the `--yes` path
-  never reads the environment.
-- **Running programs after rendering is opt-in only.** `--git` (initialise a repository and make
-  the first commit) and `--lock` (`uv lock`) are never defaults and never run in `plan`,
-  `validate`, or `--dry-run`.
-- **No model calls and no new runtime dependency without approval.** Items marked `[?]` name the
-  dependency they would add.
+### U4 The skill and the docs use the short form `[x]`
 
-## 3. Steps
+- Skill step 3: to resolve a chosen pack, use `--hub owner/pack@tag` instead of cloning the hub and
+  copying pins. Searching still reads the hub's entries (the clone stays for search only, until the
+  hub publishes `index.json` at a stable URL). The agent passes `-p` and `-y` itself: an agent never
+  answers a question in the terminal.
+- README: a "From pytemplate-hub" section leading with the short command; the fully pinned command
+  as "Offline and in CI"; a line that `-h` is `--hub` and `--help` is help.
+- CHANGELOG under 3.5.0, including the one visible change: `pytemplate create foo` in a terminal
+  with no `-p` now asks for the profile instead of choosing `python`.
 
-### Phase 1: command-line experience (PR 1)
+## 4. Tests
 
-- [x] 1. `-y`/`--yes` on `create` and `create-project`; `--no-input` hidden and deprecated with
-       a stderr warning. Tests for both spellings and the warning. (U2)
-- [x] 2. Refuse to prompt without a TTY (exit 1, actionable message); `--json` implies `--yes`.
-       (U1, U7)
-- [x] 3. Errors and warnings on stderr through one `Console(stderr=True, soft_wrap=True)`; JSON
-       stays on stdout. (U3)
-- [x] 4. "Did you mean" suggestions with `difflib.get_close_matches` for profiles, components,
-       schemas, and `--data` keys. (U4)
-- [x] 5. Next steps after `create`: `cd`, then the profile's lifecycle commands. Human output
-       only; JSON already carries `lifecycle_commands`. (U5)
-- [x] 6. Shell completion of profile and component identifiers from the bundled catalog. (U8)
-- [x] 7. README, skill (`SKILL.md`), CONTRIBUTING, CI workflow, and CHANGELOG use `-y`.
-       `tests/test_skill.py` still passes.
+All offline. The hub is a local HTTP server or a `file://` `PYTEMPLATE_HUB_URL` over a fixture
+entry that points at a local git pack fixture.
 
-### Phase 2: core and performance (PR 2)
+- `--hub` resolves the newest non-yanked version, an explicit tag, and refuses a yanked tag, an
+  unknown tag, an unknown pack, format 2, and every mix with `--template*` flags.
+- A tag that moved after listing is refused exactly as with the long command (same message).
+- The stderr line, the `--json` fields, and `hub` in `.pytemplate.toml`.
+- `-h` with no value prints help, on each command that has it; `--help` unchanged.
+- The profile question: one profile, many profiles, `-y` with and without `python`, no terminal,
+  cancel. `_stdin_is_tty` and `questionary` are replaced in tests, as for the component picker.
+- A local folder (`--template ./pack`) gets the profile question too; pins and `--hub` stay refused
+  with it.
+- The skill test checks the new step 3 names only options the CLI has.
 
-- [x] 8. Import Copier and PyYAML lazily, inside the functions that render; add a test that
-       `import pytemplate.main` does not import `copier`. Target: `--help` under 150 ms. (C1)
-- [x] 9. One pass for `validate`: `plan()` already validates, so add the target check to it and
-       drop the second catalog open. (C2)
-- [x] 10. `create --dry-run` runs the same checks as `validate`, answers included. (C3)
-- [x] 11. Git hardening: `GIT_TERMINAL_PROMPT=0`, a timeout (default 120 s), and an error that
-        names the URL and the cause. (C4)
-- [x] 12. Accept a full commit hash as `--template-ref` (`git init` + `fetch --depth 1 origin
-        <sha>`). (C5)
-- [x] 13. One request-error hierarchy: the profile, component, manifest, and configuration errors
-        also subclass `RequestError` (keeping `ValueError` for compatibility). The CLI and API
-        catch one type. (C7)
-- [x] 14. Shared request options in `main.py` (one options object built once per command),
-        without changing any option name or default. (C8)
-- [x] 15. Parse pack YAML (with includes) for unsafe settings instead of a regex. (C9)
-- [x] 16. Small cleanups and `pytemplate.__version__`. (C10)
+## 5. Outside this repository
 
-### Phase 3: package and community (PR 3; workflow edits need approval)
+- **Hub site** (pytemplate-hub): the copy button shows
+  `uvx pytemplate-uv@latest create <name> -h owner/pack@tag`; the command builder adds `-p` and
+  `-y` when the reader picks a profile; a "Fully pinned" tab keeps today's command. Ships after 3.5
+  is on PyPI.
+- **Hub rule** the lookup relies on: a listed tag's commit and digest never change. `verify`
+  already fails a moved tag; the hub's docs should state that an entry's versions are append-only.
 
-- [x] 17. A CI job that runs the unit tests with `uv sync --resolution lowest-direct`, and raise
-        any lower bound that fails. (P1)
-- [x] 18. SHA-pin this repository's Actions, add zizmor to CI, and Dependabot for Actions. (P2;
-        CI edit)
-- [x] 19. PEP 740 attestations on release. (P3; release-workflow edit)
-- [x] 20. README badges (PyPI version, Python versions, CI, licence), a `Documentation` URL, a
-        `SECURITY.md`, and issue templates for bugs and template requests. (P4, P5)
-- [x] 21. A docs site generated from the existing Markdown (MkDocs Material or Zensical) on
-        GitHub Pages. (P4; dev dependency and a Pages workflow)
-- [x] 22. Classifier `5 - Production/Stable`. (P6)
+## 6. Decisions
 
-### Phase 4: features (one PR each)
+- `[x]` D1 `-h` is the short form of `--hub` (the maintainer's call, 2026-11-25). Cost: `-h` is
+  help in most tools; U2 covers `create -h` alone, and `--help` is unchanged.
+- `[x]` D2 Release: 3.4.0 was tagged as prepared; this is 3.5.0.
+- `[x]` D3 Trust (accepted, no extra prompt): `--hub` trusts the hub's `main` branch over HTTPS for the pins. The long command
+  remains for anyone who does not. Accept, or also require `--hub` to print the long command and
+  ask for confirmation the first time (not recommended: one more prompt for every new user).
 
-- [x] 23. `library` profile: a package with tests and tooling but no CLI, `kind = "library"`. One
-        combination per optional component. (U9)
-- [x] 24. Interactive component picker when `create` runs in a terminal with no `-c`: a
-        multi-select of the profile's optional components, with `requires` added and
-        `conflicts` refused as now. Needs `questionary` as a direct dependency (Copier already
-        installs it). (U6)
-- [x] 25. `pytemplate status [PATH]`: read `.pytemplate.toml` and list generated files that were
-        changed, deleted, or added since generation. Read-only; it never merges or rewrites, so
-        it does not reopen the 3.1.0 decision on `update`.
-- [x] 26. Opt-in `--git` and `--lock` on `create`.
-- [x] 27. `release` component for `python` and `library`: a trusted-publishing release
-        workflow with a tag-equals-version check, like this repository's own.
-- [x] 28. `devcontainer` component (already a 3.1 candidate).
-- [x] 29. SHA-pinned Actions and a dependency cooldown (`exclude-newer`) in generated CI. Needs
-        a way to keep the pins current, since `update` is gone: Dependabot config in the
-        generated project is the likely answer.
-- [x] 31. Cache git packs pinned to a commit and a digest, keyed by both, under the user cache
-        directory; `--no-cache` to bypass. Needs `platformdirs` or a small cache-path
-        function. (C6)
+## 7. Phases
 
-### Release
+One pull request each; the maintainer merges.
 
-- [x] 32. CHANGELOG, version 3.2.0, and `uv.lock`.
-- [x] 32a. After release: the hub's generated commands use `-y` (pytemplate-hub PR #12).
-- [x] 33. Maintainer only: confirm CI is green on all runners, then tag `v3.2.0` (released to
-       PyPI 2026-11-17).
-
-## 4. Acceptance criteria
-
-- `pytemplate create demo -y` and `pytemplate create demo --no-input` produce byte-identical
-  projects; the second prints one deprecation warning on stderr.
-- `pytemplate create demo </dev/null` exits 1 before rendering and names `-y`.
-- No error text appears on stdout outside `--json`.
-- `pytemplate --help` imports no Copier module.
-- `pytemplate validate --template <git pack>` clones once.
-- Every existing request file, JSON field, exit code, and question works unchanged.
-- The 28 generated combinations still pass their lifecycle commands, plus the new `library`
-  combinations.
-
-## 5. Not planned
-
-| Idea | Why not |
+| Phase | Scope |
 | --- | --- |
-| A bundled LLM-application profile | It must choose a provider SDK; it belongs in a template pack. |
-| Prompting or generating with a model | The generator stays deterministic and offline. |
-| Bringing back `update` | Merging a template release into a changed project was not safe (3.1.0). `status` reports drift without changing files. |
-| `pytemplate mcp` | Still waits for approval of an optional `mcp` dependency; `--json` and the skill cover it. |
+| A | U1 and U2, with tests |
+| B | U3, with tests |
+| C | U4 (skill, README, CHANGELOG), version 3.5.0; tag after the maintainer's word |

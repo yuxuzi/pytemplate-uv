@@ -116,3 +116,13 @@ def test_list_json_outputs_parse() -> None:
         "worker",
     }
     assert component["compatible_profiles"] == ["fastapi"]
+
+
+def test_skill_step_three_names_only_options_the_cli_has() -> None:
+    text = skill_text()
+    step = text[text.index("## 3. Find a template pack") : text.index("## 4. Collect inputs")]
+    assert "list-profiles -h owner/pack@tag" in step
+    for command in ("list-profiles", "create"):
+        helped = runner.invoke(app, [command, "--help"]).output
+        assert "--hub" in helped
+        assert "-h" in helped

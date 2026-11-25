@@ -74,6 +74,9 @@ format.
   - they may not declare `_tasks`, `_migrations`, or `_jinja_extensions`;
   - they may not contain symlinks.
 - A pack versions itself: its git tags and its `pytemplate-pack.toml` `version`.
+- A pack listed on pytemplate-hub is selected with `-h OWNER/PACK[@TAG]` (`--hub`): the pins are
+  read from the hub's index and then checked exactly as the pinned form below. `-h` alone shows
+  help. The hub is a lookup only, and a tag that moved or files that changed are refused as before.
 - A git pack can be pinned with `--template-commit` and `--template-digest`, or `template_commit`
   and `template_digest` in a request file, alongside its ref; the discovery commands accept the
   same options. A fetched pack that does not match is refused with exit code 1, before any of it is

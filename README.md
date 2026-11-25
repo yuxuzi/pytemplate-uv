@@ -254,19 +254,22 @@ index of template packs. The hub stores references, not files: each pack stays i
 GitHub repository, and each listed version records the tag, commit, and digest that passed the
 hub's checks.
 
-1. Find a pack on the hub and read its repository (a pack's generated project runs code when you
-   use it).
-2. Note the listing's tag, commit, and digest, and pass all three to every command, so you see and
-   render exactly the files the hub checked. A pack that does not match them is refused before
-   anything is read.
-3. See its profiles, then create a project:
+1. Find a pack on the hub (a pack's generated project runs its code when you use it).
+2. Create from it with the hub's short form. `-h` is `--hub`: the pack's pins (tag, commit, and
+   digest) are read from the hub's listing, and a pack that does not match them is refused before
+   anything is read. Without `-p`, the command asks for the profile in a terminal.
 
 ```bash
-uvx pytemplate-uv@latest list-profiles \
-  --template gh:yuxuzi/pytemplate-starters --template-ref v1.0.0 \
-  --template-commit 2886e570d1b964811e63b6aa93f3e0ede2e8e7d2 \
-  --template-digest 9257161472cfe280e79c7452ff0e01618b278ea57b7d74280b882976969de924
+uvx pytemplate-uv@latest list-profiles -h yuxuzi/pytemplate-starters@v1.0.0
+uvx pytemplate-uv@latest create my-app -h yuxuzi/pytemplate-starters@v1.0.0 -p cli -y
+```
 
+Leave off `@v1.0.0` to take the newest version that is not yanked. `--help` is help.
+
+**Offline and in CI:** the fully pinned form does not read the hub. Use it on machines without
+network access, or wherever you want the pins written out in the command itself:
+
+```bash
 uvx pytemplate-uv@latest create my-app -p cli \
   --template gh:yuxuzi/pytemplate-starters --template-ref v1.0.0 \
   --template-commit 2886e570d1b964811e63b6aa93f3e0ede2e8e7d2 \

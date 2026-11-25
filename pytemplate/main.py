@@ -25,6 +25,8 @@ from pytemplate.agent_skill import (
 from pytemplate.cli_options import (
     ConfigArgument,
     ForceOption,
+    HubHelpCommand,
+    HubOption,
     JsonOption,
     NameOption,
     NoCacheOption,
@@ -39,8 +41,9 @@ from pytemplate.cli_options import (
 )
 from pytemplate.configuration import ConfigurationError, load_render_request
 from pytemplate.errors import RenderError, RequestError
+from pytemplate.hub import HubPin, pin_for
 from pytemplate.packs import open_catalog
-from pytemplate.picker import choose_components
+from pytemplate.picker import choose_components, choose_profile
 from pytemplate.post_create import run_post_steps
 from pytemplate.profiles import (
     Catalog,
@@ -170,7 +173,12 @@ def _request(
 ) -> RenderRequest:
     """Build a request from a TOML file or from command-line options."""
     if config is not None:
-        return load_render_request(config, dry_run=flags.get("dry_run", False))
+        if opts.hub is not None:
+            raise RequestError(
+                '--hub cannot be combined with a request file; set hub = "owner/pack@tag" in '
+                "the file instead."
+            )
+        return load_render_request(config, dry_run=flags.get("dry_run", False), notify=_announce)
     return opts.build(project_name, **flags)
 
 
@@ -193,10 +201,54 @@ def _with_picked_components(opts: RequestOptions, as_json: bool) -> RequestOptio
             digest=opts.template_digest,
             use_cache=not opts.no_cache,
         ) as (catalog, _, _):
+            if opts.profile is None:
+                raise RequestError("--profile must be chosen before its components are offered.")
             chosen = choose_components(catalog.profile(opts.profile), catalog.component_map())
     except (*_REQUEST_ERRORS, RenderError) as error:
         _fail(error, as_json)
     return replace(opts, component=chosen or None)
+
+
+def _resolved(opts: RequestOptions, as_json: bool) -> tuple[RequestOptions, HubPin | None]:
+    """Resolve `--hub` to its pins, announce the pin on stderr, and return the pinned options."""
+    try:
+        resolved, pin = opts.resolved()
+    except (*_REQUEST_ERRORS, RenderError) as error:
+        _fail(error, as_json)
+    if pin is not None:
+        err_console.print(pin.notice, markup=False)
+    return resolved, pin
+
+
+def _with_profile(
+    opts: RequestOptions, pin: HubPin | None, as_json: bool, *, ask: bool
+) -> RequestOptions:
+    """Fill in the profile when `-p` is missing.
+
+    A catalog with one profile uses it. Otherwise, when ``ask`` (a terminal without -y), the
+    user chooses; when not, ``python`` is used, or the usual unknown-profile error lists them.
+    """
+    if opts.profile is not None:
+        return opts
+    try:
+        with open_catalog(
+            opts.template,
+            opts.template_ref,
+            commit=opts.template_commit,
+            digest=opts.template_digest,
+            use_cache=not opts.no_cache,
+        ) as (catalog, _, _):
+            profiles = catalog.profiles
+            if len(profiles) == 1:
+                identifier = profiles[0].identifier
+            elif ask and profiles:
+                checks = pin.profile_lifecycles if pin is not None else None
+                identifier = choose_profile(profiles, checks)
+            else:
+                identifier = catalog.profile("python").identifier
+    except (*_REQUEST_ERRORS, RenderError) as error:
+        _fail(error, as_json)
+    return replace(opts, profile=identifier)
 
 
 def _render_and_report(
@@ -218,6 +270,7 @@ def _render_and_report(
                 "dry_run": result.dry_run,
                 "project_path": str(result.project_path),
                 "manifest_path": str(result.manifest_path) if result.manifest_path else None,
+                "template": asdict(result.source),
                 **_resolution_dict(result.resolution),
             }
         )
@@ -237,7 +290,7 @@ def _render_and_report(
     _print_next_steps(result.project_path, result.resolution, request)
 
 
-@app.command("create")
+@app.command("create", cls=HubHelpCommand)
 @request_options
 def create(
     project_name: Annotated[
@@ -273,6 +326,8 @@ def create(
             ),
             as_json,
         )
+    opts, pin = _resolved(opts, as_json)
+    opts = _with_profile(opts, pin, as_json, ask=not unattended)
     if not unattended and not opts.component:
         opts = _with_picked_components(opts, as_json)
     _render_and_report(
@@ -283,9 +338,11 @@ def create(
 
 
 # Optional, fully equivalent spelling of `create` (same arguments and options).
-app.command("create-project", help="Alias of `create`; accepts the same arguments and options.")(
-    create
-)
+app.command(
+    "create-project",
+    help="Alias of `create`; accepts the same arguments and options.",
+    cls=HubHelpCommand,
+)(create)
 
 # Standalone `create-project` executable: `create-project NAME [OPTIONS]` runs `create` directly.
 create_project_app = typer.Typer(
@@ -293,7 +350,7 @@ create_project_app = typer.Typer(
     help="Create a project from a bundled profile (same as `pytemplate create`).",
     add_completion=False,
 )
-create_project_app.command()(create)
+create_project_app.command(cls=HubHelpCommand)(create)
 
 
 @contextlib.contextmanager
@@ -305,9 +362,21 @@ def _catalog(
     commit: str | None = None,
     digest: str | None = None,
     no_cache: bool = False,
+    hub: str | None = None,
 ) -> Iterator[Catalog]:
     """Open the bundled catalog or a pack, reporting pack errors with the CLI exit codes."""
     try:
+        if hub is not None:
+            pin = pin_for(
+                hub,
+                template=template,
+                template_ref=template_ref,
+                template_commit=commit,
+                template_digest=digest,
+            )
+            err_console.print(pin.notice, markup=False)
+            template, template_ref = pin.location, pin.tag
+            commit, digest = pin.commit, pin.digest
         with open_catalog(
             template, template_ref, commit=commit, digest=digest, use_cache=not no_cache
         ) as (catalog, _, _):
@@ -316,7 +385,7 @@ def _catalog(
         _fail(error, as_json)
 
 
-@app.command("list-profiles")
+@app.command("list-profiles", cls=HubHelpCommand)
 def list_profiles_command(
     template: TemplateOption = None,
     template_ref: TemplateRefOption = None,
@@ -324,6 +393,7 @@ def list_profiles_command(
     template_digest: TemplateDigestOption = None,
     no_cache: NoCacheOption = False,
     as_json: JsonOption = False,
+    hub: HubOption = None,
 ) -> None:
     """List the profiles of the bundled catalog or a template pack."""
     with _catalog(
@@ -333,6 +403,7 @@ def list_profiles_command(
         commit=template_commit,
         digest=template_digest,
         no_cache=no_cache,
+        hub=hub,
     ) as catalog:
         profiles = catalog.profiles
     if as_json:
@@ -359,7 +430,7 @@ def list_profiles_command(
     console.print(table)
 
 
-@app.command("describe-profile")
+@app.command("describe-profile", cls=HubHelpCommand)
 def describe_profile(
     profile_id: Annotated[str, typer.Argument(help="Profile identifier")],
     template: TemplateOption = None,
@@ -368,6 +439,7 @@ def describe_profile(
     template_digest: TemplateDigestOption = None,
     no_cache: NoCacheOption = False,
     as_json: JsonOption = False,
+    hub: HubOption = None,
 ) -> None:
     """Show metadata and template inputs for a profile."""
     with _catalog(
@@ -377,6 +449,7 @@ def describe_profile(
         commit=template_commit,
         digest=template_digest,
         no_cache=no_cache,
+        hub=hub,
     ) as catalog:
         try:
             profile = catalog.profile(profile_id)
@@ -404,7 +477,7 @@ def describe_profile(
     console.print(f"Security posture: {profile.security_posture}")
 
 
-@app.command("list-components")
+@app.command("list-components", cls=HubHelpCommand)
 def list_components_command(
     template: TemplateOption = None,
     template_ref: TemplateRefOption = None,
@@ -412,6 +485,7 @@ def list_components_command(
     template_digest: TemplateDigestOption = None,
     no_cache: NoCacheOption = False,
     as_json: JsonOption = False,
+    hub: HubOption = None,
 ) -> None:
     """List the components of the bundled catalog or a template pack."""
     with _catalog(
@@ -421,6 +495,7 @@ def list_components_command(
         commit=template_commit,
         digest=template_digest,
         no_cache=no_cache,
+        hub=hub,
     ) as catalog:
         components = catalog.components
     if as_json:
@@ -445,7 +520,7 @@ def list_components_command(
     console.print(table)
 
 
-@app.command("describe-component")
+@app.command("describe-component", cls=HubHelpCommand)
 def describe_component(
     component_id: Annotated[str, typer.Argument(help="Component identifier")],
     template: TemplateOption = None,
@@ -454,6 +529,7 @@ def describe_component(
     template_digest: TemplateDigestOption = None,
     no_cache: NoCacheOption = False,
     as_json: JsonOption = False,
+    hub: HubOption = None,
 ) -> None:
     """Show metadata for a component."""
     with _catalog(
@@ -463,6 +539,7 @@ def describe_component(
         commit=template_commit,
         digest=template_digest,
         no_cache=no_cache,
+        hub=hub,
     ) as catalog:
         try:
             component = catalog.component(component_id)
@@ -509,7 +586,14 @@ def create_from_config(
     as_json: JsonOption = False,
 ) -> None:
     """Create a project from a deterministic TOML render request."""
-    _render_and_report(lambda: load_render_request(config, dry_run=dry_run), as_json)
+    _render_and_report(
+        lambda: load_render_request(config, dry_run=dry_run, notify=_announce), as_json
+    )
+
+
+def _announce(line: str) -> None:
+    """Print one line on stderr, the way `--hub` announces the pin it resolved."""
+    err_console.print(line, markup=False)
 
 
 def _plan_dict(result: RenderPlan) -> dict[str, object]:
@@ -524,7 +608,7 @@ def _plan_dict(result: RenderPlan) -> dict[str, object]:
     }
 
 
-@app.command("validate")
+@app.command("validate", cls=HubHelpCommand)
 @request_options
 def validate_config(
     opts: RequestOptions,
@@ -533,6 +617,9 @@ def validate_config(
     project_name: NameOption = "my-project",
 ) -> None:
     """Validate a render request, including template answers, without writing the project."""
+    if config is None:
+        opts, pin = _resolved(opts, as_json)
+        opts = _with_profile(opts, pin, as_json, ask=False)
     try:
         request = _request(config, project_name, opts, dry_run=True)
         planned = plan(request)
@@ -555,7 +642,7 @@ def validate_config(
         console.print(f"Added by requirements: {', '.join(resolution.added)}")
 
 
-@app.command("plan")
+@app.command("plan", cls=HubHelpCommand)
 @request_options
 def plan_command(
     opts: RequestOptions,
@@ -564,6 +651,9 @@ def plan_command(
     project_name: NameOption = "my-project",
 ) -> None:
     """Show the resolved components, dependencies, and exact files, without writing anything."""
+    if config is None:
+        opts, pin = _resolved(opts, as_json)
+        opts = _with_profile(opts, pin, as_json, ask=False)
     try:
         result = plan(_request(config, project_name, opts))
     except (*_REQUEST_ERRORS, RenderError) as error:

@@ -69,6 +69,7 @@ class TemplateSource:
     pack_version: str | None = None
     commit: str | None = None
     digest: str | None = None
+    hub: str | None = None
 
     @property
     def is_bundled(self) -> bool:
