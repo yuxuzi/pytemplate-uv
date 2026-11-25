@@ -7,12 +7,16 @@ import inspect
 import typing
 from collections.abc import Callable
 from dataclasses import dataclass
+from dataclasses import replace as dataclass_replace
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
+from typer.core import TyperCommand
 
 from pytemplate.configuration import ConfigurationError
+from pytemplate.errors import RequestError
+from pytemplate.hub import HubPin, pin_for
 from pytemplate.profiles import bundled_catalog
 from pytemplate.rendering import RenderRequest
 
@@ -41,6 +45,15 @@ TemplateDigestOption = Annotated[
     typer.Option(
         "--template-digest",
         help="Refuse the git pack unless its files match this SHA-256 digest",
+    ),
+]
+HubOption = Annotated[
+    str | None,
+    typer.Option(
+        "--hub",
+        "-h",
+        help="Pack listed on pytemplate-hub, as OWNER/PACK or OWNER/PACK@TAG; its pins are read "
+        "from the hub. -h with no value shows help.",
     ),
 ]
 NoCacheOption = Annotated[
@@ -120,6 +133,26 @@ NameOption = Annotated[
 ]
 
 
+def _bare_hub_help(args: list[str]) -> list[str]:
+    """Turn a `-h` that has no value (last, or followed by an option) into `--help`."""
+    rewritten: list[str] = []
+    for index, token in enumerate(args):
+        follower = args[index + 1] if index + 1 < len(args) else None
+        if token == "-h" and (follower is None or follower.startswith("-")):
+            rewritten.append("--help")
+        else:
+            rewritten.append(token)
+    return rewritten
+
+
+class HubHelpCommand(TyperCommand):
+    """A command whose `-h` means `--hub`, except that a bare `-h` shows the command's help."""
+
+    def parse_args(self, ctx: Any, args: list[str]) -> list[str]:
+        """Parse the arguments after a bare `-h` has been read as `--help`."""
+        return super().parse_args(ctx, _bare_hub_help(args))
+
+
 @dataclass(frozen=True)
 class RequestOptions:
     """The request options shared by `create`, `validate`, and `plan`, read once per command."""
@@ -133,6 +166,31 @@ class RequestOptions:
     template_commit: str | None
     template_digest: str | None
     no_cache: bool = False
+    hub: str | None = None
+
+    def resolved(self) -> tuple[RequestOptions, HubPin | None]:
+        """Return the options with the pins of ``--hub`` filled in, and the pin used.
+
+        Fetches the hub entry once; the caller announces the pin and then uses these options.
+        """
+        if self.hub is None:
+            return self, None
+        pin = pin_for(
+            self.hub,
+            template=self.template,
+            template_ref=self.template_ref,
+            template_commit=self.template_commit,
+            template_digest=self.template_digest,
+        )
+        resolved = dataclass_replace(
+            self,
+            hub=pin.pack,
+            template=pin.location,
+            template_ref=pin.tag,
+            template_commit=pin.commit,
+            template_digest=pin.digest,
+        )
+        return resolved, pin
 
     def build(
         self,
@@ -143,6 +201,9 @@ class RequestOptions:
         dry_run: bool = False,
     ) -> RenderRequest:
         """Build a request from these options and the per-command flags."""
+        if self.hub is not None and self.template_commit is None:
+            # Fail closed: an unresolved --hub must never reach the catalog unpinned.
+            raise RequestError("--hub was not resolved to its pins before the request was built.")
         return RenderRequest(
             profile_id=self.profile,
             project_name=project_name,
@@ -157,6 +218,7 @@ class RequestOptions:
             template_commit=self.template_commit,
             template_digest=self.template_digest,
             use_cache=not self.no_cache,
+            hub=self.hub,
         )
 
 
@@ -171,6 +233,7 @@ _SHARED_PARAMETERS: dict[str, tuple[object, object]] = {
     "template_ref": (TemplateRefOption, None),
     "template_commit": (TemplateCommitOption, None),
     "template_digest": (TemplateDigestOption, None),
+    "hub": (HubOption, None),
     "no_cache": (NoCacheOption, False),
     "as_json": (JsonOption, False),
 }

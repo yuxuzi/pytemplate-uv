@@ -12,7 +12,7 @@ import sys
 import tempfile
 from collections.abc import Mapping, Sequence
 from contextlib import AbstractContextManager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
@@ -98,6 +98,7 @@ class RenderRequest:
     template_commit: str | None = None
     template_digest: str | None = None
     use_cache: bool = True
+    hub: str | None = None
 
 
 def _open_request_catalog(
@@ -295,6 +296,7 @@ def write_generation_manifest(
         ("pack_version", source.pack_version),
         ("commit", source.commit),
         ("digest", source.digest),
+        ("hub", source.hub),
     ):
         if value:
             lines.append(f"{key} = {_toml(value)}")
@@ -445,7 +447,7 @@ def _render_into(
 def _source(request: RenderRequest, opened: TemplateSource) -> TemplateSource:
     """Return the source to record: bundled projects point at the versioned git tag."""
     if not opened.is_bundled:
-        return opened
+        return replace(opened, hub=request.hub)
     installed = generator_version()
     ref = None if installed == "uninstalled" else f"v{installed}"
     return TemplateSource(kind=opened.kind, location=DEFAULT_TEMPLATE_SOURCE, ref=ref)
