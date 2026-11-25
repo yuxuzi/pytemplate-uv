@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 244 64" role="img" aria-label="pytemplate">
+  <!-- A snake wraps the wordmark: under the descenders, up around the end, head over "te". Outline the text before release. -->
+  <path d="M5 51C38 61 88 45 128 51S196 60 220 45C236 35 237 15 222 10C212 7 204 11 199 16" fill="none" stroke="#e8a317" stroke-width="6.5" stroke-linecap="round"/>
+  <path d="M5 51C38 61 88 45 128 51S196 60 220 45C236 35 237 15 222 10C212 7 204 11 199 16" fill="none" stroke="#7a4f00" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="1.5 7" opacity=".45"/>
+  <text x="12" y="41" font-family="Martian Mono, ui-monospace, monospace" font-weight="700" font-size="31" letter-spacing="-2.2" fill="#13201a"><tspan fill="#e8a317">py</tspan>template</text>
+  <path d="M5 51C38 61 88 45 128 51S196 60 220 45" fill="none" stroke="#e8a317" stroke-width="6.5" stroke-linecap="round" stroke-dasharray="0 22 40 400"/>
+  <ellipse cx="195" cy="18.5" rx="7.5" ry="5.2" transform="rotate(-32 195 18.5)" fill="#e8a317"/>
+  <circle cx="193" cy="16.2" r="1.3" fill="#13201a"/>
+  <path d="M188.5 22.5l-4 3.2m4-3.2l-4.6.4" stroke="#b42318" stroke-width="1.3" stroke-linecap="round"/>
+</svg>

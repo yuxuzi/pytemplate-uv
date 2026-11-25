@@ -1,28 +1,45 @@
 # pytemplate-uv
 
+<p align="center">
+  <img src="docs/assets/logo.svg" alt="pytemplate-uv logo" width="160">
+</p>
+
+<p align="center"><strong>Generate once. Own your code.</strong></p>
+
+<p align="center">
+
 [![PyPI](https://img.shields.io/pypi/v/pytemplate-uv)](https://pypi.org/project/pytemplate-uv/)
 [![Python](https://img.shields.io/pypi/pyversions/pytemplate-uv)](https://pypi.org/project/pytemplate-uv/)
 [![CI](https://github.com/yuxuzi/pytemplate-uv/actions/workflows/ci.yml/badge.svg)](https://github.com/yuxuzi/pytemplate-uv/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-> **Generate production-ready Python projects in seconds.** A deterministic application factory
-> with profiles, composable components, and template packs.
+</p>
 
-A modern application factory that generates **uv-native** Python projects. With the bundled
-templates, every project passes linting, formatting, type-checking, and tests from the first
-commit. Choose a profile (a typed package
-with a CLI, or a FastAPI service), add components (database, authentication, background jobs), and get a
-ready-to-deploy project.
+pytemplate-uv is a deterministic application factory that generates **uv-native** Python
+projects: choose a profile (a typed CLI package or a FastAPI service), add components (database,
+authentication, background jobs), and get a project that passes linting, formatting,
+type-checking, and tests from its first commit.
+
+```bash
+uvx pytemplate-uv@latest create my-tool -y
+cd my-tool
+uv run pytest
+```
 
 - ✅ **Deterministic:** identical requests produce byte-identical projects
-- ✅ **Checked:** every bundled component combination passes strict quality gates in CI
+- ✅ **Checked:** every bundled component combination is generated and checked in CI
 - ✅ **uv-native:** generated projects need only `uv` and `uvx` (no pip, virtualenv activation, or make)
-- ✅ **Extensible:** use template packs to customize without forking
 - ✅ **Type-safe:** strict mypy on generated code; requests are validated before anything is written
+- ✅ **Extensible:** use template packs to customize without forking
 
-> **Looking for more templates?** [pytemplate-hub](https://github.com/yuxuzi/pytemplate-hub) is the official place to find template
-> packs for pytemplate-uv: each listing is checked and gives a ready command pinned to the exact
-> files that were checked. New to both? Start with the [tutorial](https://github.com/yuxuzi/pytemplate-hub/blob/main/docs/tutorial.md).
+## Find templates
+
+- **Browse** template packs on [pytemplate-hub](https://github.com/yuxuzi/pytemplate-hub), the
+  official index. Each listing is checked, and the hub stores references rather than files.
+- **Copy a pinned command.** Each listed version gives a command pinned to the tag, commit, and
+  digest that were checked, so you render exactly what the hub reviewed.
+  See [Find templates on the hub](#find-templates-on-the-hub) for the walk-through.
+- **Read** posts and the tutorial on the pytemplate website: <!-- TODO: site URL -->
 
 ## What you get
 
@@ -74,8 +91,7 @@ your own template packs are not covered by these checks; test your pack the same
 **The solution:**
 - Start from reviewed patterns: layered architecture, health checks, structured logs, auth
   behind a principal and scopes
-- Every bundled component combination is generated and checked in CI (28 combinations, on
-  Linux and Windows)
+- Every bundled component combination is generated and checked in CI, on Linux and Windows
 - Script it: the same request always produces the same project
 
 **Good fit for:**
