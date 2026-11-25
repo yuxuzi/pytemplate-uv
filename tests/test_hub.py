@@ -251,7 +251,8 @@ def test_request_file_refuses_hub_with_template(listed: dict[str, str], tmp_path
     config = tmp_path / "request.toml"
     config.write_text(
         'project_name = "demo"\nprofile = "tool"\n'
-        f'output_dir = "{(tmp_path / "out").as_posix()}"\nhub = "{PACK}"\ntemplate = "gh:yuxuzi/demo-pack"\n',
+        f'output_dir = "{(tmp_path / "out").as_posix()}"\nhub = "{PACK}"\n'
+        'template = "gh:yuxuzi/demo-pack"\n',
         encoding="utf-8",
     )
 
