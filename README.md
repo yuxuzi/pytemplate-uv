@@ -71,7 +71,7 @@ Every project generated from the bundled templates passes:
 - ✅ Strict `mypy` (type safety)
 - ✅ `pytest` (tests included)
 
-This is verified across all 28 bundled component combinations on every commit. Projects from
+This is verified across every bundled component combination on every commit. Projects from
 your own template packs are not covered by these checks; test your pack the same way.
 
 ### Built for teams
