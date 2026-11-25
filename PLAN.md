@@ -132,9 +132,8 @@ entry that points at a local git pack fixture.
 
 - `[x]` D1 `-h` is the short form of `--hub` (the maintainer's call, 2026-11-25). Cost: `-h` is
   help in most tools; U2 covers `create -h` alone, and `--help` is unchanged.
-- `[?]` D2 Release: 3.5.0 after 3.4.0 is tagged (recommended), or fold this into 3.4.0, which is
-  prepared on `main` but not tagged.
-- `[?]` D3 Trust: `--hub` trusts the hub's `main` branch over HTTPS for the pins. The long command
+- `[x]` D2 Release: 3.4.0 was tagged as prepared; this is 3.5.0.
+- `[x]` D3 Trust (accepted, no extra prompt): `--hub` trusts the hub's `main` branch over HTTPS for the pins. The long command
   remains for anyone who does not. Accept, or also require `--hub` to print the long command and
   ask for confirmation the first time (not recommended: one more prompt for every new user).
 

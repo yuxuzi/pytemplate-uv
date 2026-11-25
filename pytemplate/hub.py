@@ -20,7 +20,7 @@ from pytemplate.packs import _git_timeout
 
 HUB_URL_ENV = "PYTEMPLATE_HUB_URL"
 DEFAULT_HUB_INDEX = "https://raw.githubusercontent.com/yuxuzi/pytemplate-hub/main/index"
-HUB_SITE = "https://github.com/yuxuzi/pytemplate-hub"
+HUB_SITE = "https://yuxuzi.github.io/pytemplate-hub/"
 _SPEC = re.compile(
     r"^([A-Za-z0-9][A-Za-z0-9-]*)/([a-z0-9][a-z0-9-]*)(?:@([A-Za-z0-9][A-Za-z0-9._-]*))?$"
 )

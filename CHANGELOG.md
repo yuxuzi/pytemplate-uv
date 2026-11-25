@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## [3.5.0] — 2026-11-25
+
+3.5.0 shortens the command for a pack on pytemplate-hub to `create <name> -h owner/pack`, and asks
+for the profile when `-p` is missing.
+
 ### Added
 
 - `-h, --hub OWNER/PACK[@TAG]` on `create`, `validate`, `plan`, and the `list-*` and `describe-*`
@@ -21,6 +26,8 @@ All notable changes to this project are documented here. The format follows
   first, instead of choosing `python` silently. A catalog with one profile uses it without asking;
   `-y` and `--json` keep the previous choice (`python`, or the error that lists the profiles).
   `validate` and `plan` never ask.
+- The skill searches the hub's published `index.json` instead of cloning the hub, and resolves the
+  chosen pack with `-h owner/pack@tag`. Reinstall it with `pytemplate skill install --force`.
 
 ## [3.4.0] — 2026-11-25
 
