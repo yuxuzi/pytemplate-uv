@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## [3.6.0] — 2026-11-25
+
+3.6.0 moves the documentation to the pytemplate website and exports the pack digest.
+
 ### Added
 
 - `pytemplate.api.pack_digest(root)` returns a pack's digest, the value `--template-digest` pins,
