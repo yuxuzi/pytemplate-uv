@@ -9,6 +9,9 @@ releases::
     planned = api.plan(request)     # resolution and file list; writes nothing
     result = api.render(request)    # renders and publishes the project
 
+``pack_digest(root)`` returns a pack's digest, the value ``--template-digest`` pins; tools that
+record digests, such as pytemplate-hub, should call it rather than compute their own.
+
 Errors: catch `RequestError` for an invalid request (nothing was written); it covers
 `ConfigurationError`, `ManifestError`, `PackError`, and the profile and component errors, which are
 also `ValueError` for compatibility. Any other `RenderError` means rendering or writing failed.
@@ -19,7 +22,13 @@ from __future__ import annotations
 from pytemplate.configuration import ConfigurationError
 from pytemplate.configuration import load_render_request as load_request
 from pytemplate.errors import PackError, RenderError, RequestError
-from pytemplate.packs import PackManifest, TemplateSource, open_catalog, read_pack_manifest
+from pytemplate.packs import (
+    PackManifest,
+    TemplateSource,
+    open_catalog,
+    pack_digest,
+    read_pack_manifest,
+)
 from pytemplate.profiles import (
     Catalog,
     Component,
@@ -59,6 +68,7 @@ __all__ = [
     "bundled_catalog",
     "load_request",
     "open_catalog",
+    "pack_digest",
     "read_pack_manifest",
     "plan",
     "render",

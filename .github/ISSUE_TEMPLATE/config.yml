@@ -4,5 +4,5 @@ contact_links:
     url: https://github.com/yuxuzi/pytemplate-uv/security/advisories/new
     about: Report vulnerabilities privately; do not open a public issue.
   - name: Documentation
-    url: https://yuxuzi.github.io/pytemplate-uv/
+    url: https://yuxuzi.github.io/pytemplate-hub/learn/
     about: Read the documentation before opening an issue.
