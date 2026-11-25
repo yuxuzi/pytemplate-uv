@@ -24,6 +24,13 @@ _NAMES: dict[str, Any] = {"type": "array", "items": _TEXT, "uniqueItems": True}
 _GROUPS: dict[str, Any] = {"type": "object", "additionalProperties": _NAMES}
 _CONTRACT: dict[str, Any] = {"const": CONTRACT_VERSION}
 _IDENTIFIER: dict[str, Any] = {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"}
+_CATEGORY: dict[str, Any] = {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"}
+_KEYWORD: dict[str, Any] = {
+    "type": "string",
+    "minLength": 1,
+    "maxLength": 30,
+    "pattern": "^[^A-Z]*$",
+}
 
 
 def _object(properties: dict[str, Any], required: list[str], **extra: Any) -> dict[str, Any]:
@@ -126,6 +133,8 @@ PACK = _document(
             "name": _TEXT,
             "description": _TEXT,
             "version": _TEXT,
+            "categories": {"type": "array", "items": _CATEGORY},
+            "keywords": {"type": "array", "maxItems": 12, "items": _KEYWORD},
         },
         ["contract", "id", "name", "description", "version"],
     ),

@@ -267,7 +267,7 @@ the same layout as the bundled templates:
 
 ```
 my-pack/
-  pytemplate-pack.toml       # contract = 1, id, name, description, version
+  pytemplate-pack.toml       # contract = 1, id, name, description, version; optional categories, keywords
   copier.yml                 # _subdirectory: "{{ profile }}/template"; --- !include questions.yml
   questions.yml              # profile, project_name, package_name, components, ...
   <profile>/profile.toml     # the profile manifest (pytemplate schema profile)
@@ -286,6 +286,10 @@ pytemplate create my-tool -p tool --template gh:org/my-pack --template-ref v1.2.
   - `_tasks`, `_migrations`, `_jinja_extensions`, `_external_data`, and symlinks are rejected,
     including in files a pack's `copier.yml` includes.
 - Pack-generated projects record the pack's source and tag.
+- `pytemplate-pack.toml` may also list `categories` (lowercase slugs: letters, digits, and
+  hyphens, starting with a letter) and `keywords` (at most 12 lowercase strings of 1 to 30
+  characters, with no spaces at either end). Both are optional and checked for shape only; the
+  template hub decides their vocabulary. Wrong shapes are refused with the key named.
 - Projects from a git pack also record the commit and digest they were rendered from. To refuse a
   pack that changed, pin them:
   ```bash

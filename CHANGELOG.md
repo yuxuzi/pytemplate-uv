@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## [3.4.0] — 2026-11-25
+
+### Added
+
+- `pytemplate-pack.toml` accepts two optional keys: `categories`, a list of lowercase slugs, and
+  `keywords`, at most 12 lowercase strings of up to 30 characters. Only their shape is checked; the
+  template hub owns the vocabulary. A wrong shape is refused with an error naming the key.
+- `pytemplate.api` exports `PackManifest` and `read_pack_manifest()`, which read a pack's manifest
+  including the two keys. The published `pack` JSON Schema lists them.
+
 ## [3.3.0] — 2026-11-24
 
 3.3.0 connects pytemplate-uv to pytemplate-hub, the index of template packs: the skill can find a

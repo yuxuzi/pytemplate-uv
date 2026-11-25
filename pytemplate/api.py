@@ -19,7 +19,7 @@ from __future__ import annotations
 from pytemplate.configuration import ConfigurationError
 from pytemplate.configuration import load_render_request as load_request
 from pytemplate.errors import PackError, RenderError, RequestError
-from pytemplate.packs import TemplateSource, open_catalog
+from pytemplate.packs import PackManifest, TemplateSource, open_catalog, read_pack_manifest
 from pytemplate.profiles import (
     Catalog,
     Component,
@@ -45,6 +45,7 @@ __all__ = [
     "ConfigurationError",
     "ManifestError",
     "PackError",
+    "PackManifest",
     "Profile",
     "ProfileNotFoundError",
     "RenderError",
@@ -58,6 +59,7 @@ __all__ = [
     "bundled_catalog",
     "load_request",
     "open_catalog",
+    "read_pack_manifest",
     "plan",
     "render",
     "resolve",

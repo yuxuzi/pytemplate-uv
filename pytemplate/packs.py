@@ -32,9 +32,30 @@ BUNDLED = "bundled"
 # Copier settings that run code, load extensions, or fetch data; packs must never declare them.
 _UNSAFE_SETTINGS = ("_tasks", "_migrations", "_jinja_extensions", "_external_data")
 _GIT_PREFIXES = ("gh:", "gl:", "git+", "https://", "http://", "ssh://", "git@", "file://")
-_PACK_KEYS = frozenset({"contract", "id", "name", "description", "version"})
+_PACK_KEYS = frozenset(
+    {"contract", "id", "name", "description", "version", "categories", "keywords"}
+)
+MAX_KEYWORDS = 12
+MAX_KEYWORD_LENGTH = 30
+_CATEGORY = re.compile(r"[a-z][a-z0-9-]*")
 _COMMIT = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
+
+
+@dataclass(frozen=True)
+class PackManifest:
+    """The contents of a pack's ``pytemplate-pack.toml``.
+
+    ``categories`` and ``keywords`` are optional and only checked for shape; the template hub
+    owns their vocabulary.
+    """
+
+    id: str
+    name: str
+    description: str
+    version: str
+    categories: tuple[str, ...] = ()
+    keywords: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -286,7 +307,48 @@ def _check_safe(root: Path) -> None:
     _check_settings(root)
 
 
-def _read_pack(root: Path) -> tuple[str, str]:
+def _categories(data: dict[str, Any]) -> tuple[str, ...]:
+    value = data.get("categories", [])
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise PackError(
+            f"{PACK_FILE}: 'categories' must be a list of lowercase slugs, got {value!r}."
+        )
+    for item in value:
+        if not _CATEGORY.fullmatch(item):
+            raise PackError(
+                f"{PACK_FILE}: category {item!r} must be a lowercase slug: letters, digits, and "
+                "hyphens, starting with a letter."
+            )
+    return tuple(value)
+
+
+def _keywords(data: dict[str, Any]) -> tuple[str, ...]:
+    value = data.get("keywords", [])
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise PackError(f"{PACK_FILE}: 'keywords' must be a list of strings, got {value!r}.")
+    if len(value) > MAX_KEYWORDS:
+        raise PackError(
+            f"{PACK_FILE}: 'keywords' has {len(value)} entries; at most {MAX_KEYWORDS} are allowed."
+        )
+    for item in value:
+        if not item or item != item.strip() or item != item.lower():
+            raise PackError(
+                f"{PACK_FILE}: keyword {item!r} must be lowercase, with no spaces at either end."
+            )
+        if len(item) > MAX_KEYWORD_LENGTH:
+            raise PackError(
+                f"{PACK_FILE}: keyword {item!r} is {len(item)} characters; at most "
+                f"{MAX_KEYWORD_LENGTH} are allowed."
+            )
+    return tuple(value)
+
+
+def read_pack_manifest(root: Path) -> PackManifest:
+    """Read and check the ``pytemplate-pack.toml`` of the pack at ``root``.
+
+    Raises ``PackError`` naming the file and key when the manifest is missing, malformed, or has
+    a key of the wrong shape.
+    """
     manifest = root / PACK_FILE
     if not manifest.is_file():
         raise PackError(f"{root} is not a template pack: {PACK_FILE} is missing.")
@@ -306,7 +368,14 @@ def _read_pack(root: Path) -> tuple[str, str]:
             raise PackError(f"{PACK_FILE}: key '{key}' must be a non-empty string.")
     if not (root / "copier.yml").is_file():
         raise PackError(f"{root} is not a template pack: copier.yml is missing.")
-    return str(data["id"]), str(data["version"])
+    return PackManifest(
+        id=str(data["id"]),
+        name=str(data["name"]),
+        description=str(data["description"]),
+        version=str(data["version"]),
+        categories=_categories(data),
+        keywords=_keywords(data),
+    )
 
 
 def cache_dir() -> Path:
@@ -442,7 +511,8 @@ def open_catalog(
                 f"Template pack '{template}' at {ref} has digest {contents}, not the pinned "
                 f"{digest}. Nothing was rendered."
             )
-        pack_id, pack_version = _read_pack(root)
+        manifest = read_pack_manifest(root)
+        pack_id, pack_version = manifest.id, manifest.version
         try:
             catalog = load_catalog(root, root / "components")
         except ManifestError as error:
