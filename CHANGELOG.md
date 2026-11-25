@@ -18,6 +18,15 @@ pack there, and the README shows where to find and share packs.
   bundled profile fits. It shows the candidates and whether each is listed or reviewed, waits for
   the user's choice, and pins the request to the listed commit and digest. Reinstall the skill with
   `pytemplate skill install --force`.
+- `list-profiles`, `describe-profile`, `list-components`, and `describe-component` accept
+  `--template-commit`, `--template-digest`, and `--no-cache`, so you can inspect exactly the
+  pack revision you will render.
+
+### Fixed
+
+- The docs no longer claim that a cached pinned pack is refused when its tag moves. A cache hit is
+  checked against the digest but not fetched again, so it renders the pinned files and notices a
+  moved tag only on the next fetch (`--no-cache`).
 
 ### Documentation
 

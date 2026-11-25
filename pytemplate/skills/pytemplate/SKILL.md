@@ -37,8 +37,9 @@ Use the JSON output, not guesses:
   its dependencies, the files it owns, and the environment `settings` it reads.
 - If the user names a template pack, add `--template <dir or gh:org/repo>` (and
   `--template-ref <tag>`) to every command, and set `template`/`template_ref` in the request. If
-  they also give a commit or digest, pass `--template-commit` and `--template-digest` to `create`,
-  `plan`, and `validate`. Treat a refusal as a sign the pack changed; never drop the pin to get past it.
+  they also give a commit or digest, pass `--template-commit` and `--template-digest` to every
+  command, including the discovery commands above. Treat a refusal as a sign the pack changed;
+  never drop the pin to get past it.
 
 Choose the profile from what the user wants to build:
 - `python`: a command-line tool, or an MCP server.
@@ -87,7 +88,8 @@ Show the user each candidate: its name, repository, tag, license, and whether it
 has `reviewed_by`) or only `listed`. Say that listing means the automated checks passed, not that
 the pack is reviewed or safe, and that the generated project runs the pack's code when used. **Wait
 for the user to choose a pack before rendering from it.** Then run step 2's discovery commands with
-`--template gh:<owner>/<repo> --template-ref <tag>`, and pin the request to the entry:
+`--template gh:<owner>/<repo> --template-ref <tag> --template-commit <commit> --template-digest
+<digest>`, and pin the request to the entry:
 
 ```toml
 template = "gh:owner/pack"

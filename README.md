@@ -240,11 +240,17 @@ hub's checks.
 
 1. Find a pack on the hub and read its repository (a pack's generated project runs code when you
    use it).
-2. See its profiles: `pytemplate list-profiles --template gh:owner/pack --template-ref v1.0.0`.
-3. Copy the listing's command, which pins the commit and digest, so a moved tag or a changed file is
-   refused before anything is written:
+2. Note the listing's tag, commit, and digest, and pass all three to every command, so you see and
+   render exactly the files the hub checked. A pack that does not match them is refused before
+   anything is read.
+3. See its profiles, then create a project:
 
 ```bash
+uvx pytemplate-uv@latest list-profiles \
+  --template gh:yuxuzi/pytemplate-starters --template-ref v1.0.0 \
+  --template-commit 2886e570d1b964811e63b6aa93f3e0ede2e8e7d2 \
+  --template-digest 9257161472cfe280e79c7452ff0e01618b278ea57b7d74280b882976969de924
+
 uvx pytemplate-uv@latest create my-app -p cli \
   --template gh:yuxuzi/pytemplate-starters --template-ref v1.0.0 \
   --template-commit 2886e570d1b964811e63b6aa93f3e0ede2e8e7d2 \
@@ -286,8 +292,11 @@ pytemplate create my-tool -p tool --template gh:org/my-pack --template-ref v1.2.
   pytemplate create my-tool -p tool --template gh:org/my-pack --template-ref v1.2.0 \
     --template-commit <commit> --template-digest <digest> -y
   ```
-  `--template-ref` also accepts a full commit hash. A pack pinned to both a commit and a digest is
-  cached under your user cache directory and checked against the digest on every use. Pass
+  `--template-ref` also accepts a full commit hash. The discovery commands (`list-profiles`,
+  `describe-profile`, `list-components`, `describe-component`) accept the same pins. A pack pinned
+  to both a commit and a digest is cached under your user cache directory and checked against the
+  digest on every use; a cached copy is not fetched again, so it always renders the pinned files,
+  and a moved tag is only noticed on the next fetch. Pass
   `--no-cache` (or set `PYTEMPLATE_NO_CACHE=1`) to fetch it again; `PYTEMPLATE_CACHE_DIR` moves
   the cache. Git never prompts for credentials, and a clone stops after 120 seconds
   (`PYTEMPLATE_GIT_TIMEOUT`).
@@ -420,7 +429,8 @@ review the generated `README.md` (and `.env.example` for FastAPI services).
 **What if I want to customize the templates?**
 Use `--template` to point to your own template pack (a directory or git repo). You get all the
 composition logic but with your own code. Before writing one, look on
-[pytemplate-hub](https://github.com/yuxuzi/pytemplate-hub) for a pack that already fits, and once yours works, list it there.
+[pytemplate-hub](https://github.com/yuxuzi/pytemplate-hub) for a pack that already fits, and once yours works, list it there; the
+[tutorial](https://github.com/yuxuzi/pytemplate-hub/blob/main/docs/tutorial.md) walks through both.
 
 **How do I keep my project updated?**
 The generated project is yours from the first commit; pytemplate does not merge later template

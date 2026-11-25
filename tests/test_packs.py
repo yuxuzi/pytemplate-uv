@@ -411,6 +411,27 @@ def test_cli_refuses_a_moved_tag_as_an_invalid_request(pack: Path, tmp_path: Pat
     assert not (tmp_path / "out" / "demo").exists()
 
 
+@pytest.mark.parametrize(
+    "command",
+    [
+        ["list-profiles"],
+        ["describe-profile", "tool"],
+        ["list-components"],
+        ["describe-component", "extra"],
+    ],
+)
+def test_discovery_commands_check_the_pin(pack: Path, command: list[str]) -> None:
+    commit = _tagged_pack(pack)
+    source = ["--template", pack.as_uri(), "--template-ref", "v1.0.0", "--json"]
+
+    moved = runner.invoke(app, [*command, *source, "--template-commit", "f" * 40])
+    pinned = runner.invoke(app, [*command, *source, "--template-commit", commit])
+
+    assert moved.exit_code == 1
+    assert "tag may have moved" in moved.output
+    assert pinned.exit_code == 0, pinned.output
+
+
 def test_request_file_carries_the_pin(pack: Path, tmp_path: Path) -> None:
     config = tmp_path / "request.toml"
     config.write_text(

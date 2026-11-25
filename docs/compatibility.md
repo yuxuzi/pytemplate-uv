@@ -75,8 +75,11 @@ format.
   - they may not contain symlinks.
 - A pack versions itself: its git tags and its `pytemplate-pack.toml` `version`.
 - A git pack can be pinned with `--template-commit` and `--template-digest`, or `template_commit`
-  and `template_digest` in a request file, alongside its ref. A pack that does not match is refused
-  with exit code 1, before any of it is read.
+  and `template_digest` in a request file, alongside its ref; the discovery commands accept the
+  same options. A fetched pack that does not match is refused with exit code 1, before any of it is
+  read. A pack pinned to both is cached, and a cached copy is checked against the digest but not
+  fetched again, so a tag moved after the first fetch is not noticed until `--no-cache` or a new
+  cache entry fetches it.
 - The digest format is stable. It is a SHA-256 over every file in the checkout, without `.git`, in
   order of their path components compared as case-sensitive strings. For each file, it hashes the
   path with forward slashes, a NUL byte, the file's bytes, and another NUL byte.

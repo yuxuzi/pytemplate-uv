@@ -394,12 +394,14 @@ def open_catalog(
     directory or a git source (``gh:org/repo``, a URL, or a local repository with ``ref``);
     git sources are cloned into a temporary directory that is removed afterwards.
 
-    ``commit`` and ``digest`` pin a git source: the pack is refused, before any of it is read, if
-    ``ref`` no longer resolves to that commit or its files no longer match that digest.
+    ``commit`` and ``digest`` pin a git source: a fetched pack is refused, before any of it is
+    read, if ``ref`` no longer resolves to that commit or its files no longer match that digest.
 
     A git source pinned to both a commit and a digest is immutable, so it is cached under the
-    user cache directory and verified on each use. ``use_cache=False`` or the environment
-    variable ``PYTEMPLATE_NO_CACHE=1`` fetches it every time instead.
+    user cache directory and verified against the digest on each use. A cache hit does not
+    resolve ``ref`` again, so a tag moved after the first fetch is not noticed; the pinned files
+    are still what renders. ``use_cache=False`` or the environment variable
+    ``PYTEMPLATE_NO_CACHE=1`` fetches it every time instead.
     """
     _check_pin(template, ref, commit, digest)
     if template is None:
