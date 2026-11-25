@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- `pytemplate.api.pack_digest(root)` returns a pack's digest, the value `--template-digest` pins,
+  so tools that record digests (such as pytemplate-hub) can use this package's function instead of
+  their own copy. A test case shared with pytemplate-hub keeps the two in step.
+
+### Changed
+
+- The documentation moved to the website, <https://yuxuzi.github.io/pytemplate-hub/learn/>: the
+  guide, template packs, the compatibility policy, and the tutorial. The README is now a summary
+  that links to each page, and the old documentation site at <https://yuxuzi.github.io/pytemplate-uv/>
+  redirects to the new pages. The package's Homepage and Documentation links point to the website.
+
 ## [3.5.0] — 2026-11-25
 
 3.5.0 shortens the command for a pack on pytemplate-hub to `create <name> -h owner/pack`, and asks

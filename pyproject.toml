@@ -32,11 +32,11 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yuxuzi/pytemplate-uv"
+Homepage = "https://yuxuzi.github.io/pytemplate-hub/"
 Repository = "https://github.com/yuxuzi/pytemplate-uv"
 Issues = "https://github.com/yuxuzi/pytemplate-uv/issues"
 Changelog = "https://github.com/yuxuzi/pytemplate-uv/blob/main/CHANGELOG.md"
-Documentation = "https://yuxuzi.github.io/pytemplate-uv/"
+Documentation = "https://yuxuzi.github.io/pytemplate-hub/learn/"
 
 [project.scripts]
 pytemplate = "pytemplate.main:app"
@@ -59,7 +59,7 @@ build-backend = "uv_build"
 [tool.uv.build-backend]
 module-name = "pytemplate"
 module-root = ""
-source-include = ["tests/**", "docs/**", "CHANGELOG.md"]
+source-include = ["tests/**", "CHANGELOG.md"]
 
 [tool.ruff]
 line-length = 100

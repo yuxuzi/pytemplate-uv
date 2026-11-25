@@ -17,7 +17,8 @@ It is published to PyPI as
 `pytemplate-uv` and supports CPython 3.11–3.15 on Windows, macOS, and Linux. `uv` and `uvx` are
 the only required tools; never use pip, virtualenv activation, or make. The roadmap is
 [PLAN.md](PLAN.md), and the versioning rules are in
-[docs/compatibility.md](docs/compatibility.md).
+the website's [Compatibility and versioning](https://yuxuzi.github.io/pytemplate-hub/learn/compatibility/)
+page.
 
 ## Commands
 
@@ -102,6 +103,16 @@ template change, also run the smoke tests. Report the real results.
   files `.gitignore.jinja` so their rules do not apply to this repository.
 - **No secrets:** manifests and answers files never store secrets or environment values, and
   generated `.env` files stay git-ignored.
+
+## Documentation
+
+User documentation lives on the pytemplate website, <https://yuxuzi.github.io/pytemplate-hub/learn/>,
+whose pages are Markdown in pytemplate-hub's `pytemplate_hub/site/learn/` (guide, packs,
+compatibility, tutorial). This repository keeps only the README, a summary that links to those
+pages by their full URL; do not add guides here. When a change is user-visible, update the matching
+page in a pytemplate-hub pull request, and name a listed pack in examples with
+`-h owner/pack@tag`. `.github/pages/` holds redirects from the old documentation site at
+<https://yuxuzi.github.io/pytemplate-uv/>; `tests/test_redirects.py` checks them.
 
 ## Conventions
 
