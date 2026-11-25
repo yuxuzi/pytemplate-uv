@@ -11,7 +11,7 @@ import pytest
 import yaml
 from cli_runner import make_runner
 
-from pytemplate import packs
+from pytemplate import api, packs
 from pytemplate.configuration import load_render_request
 from pytemplate.errors import PackError, RenderError
 from pytemplate.main import app
@@ -274,6 +274,28 @@ def test_digest_is_stable_and_ordered_by_path_components(tmp_path: Path) -> None
     assert pack_digest(tmp_path) == (
         "8404d1cecfa0e474b04aef81a1be1d97ec8eaa8ddde47a5238ab5057bec4ccdb"
     )
+
+
+# A shared test vector: pytemplate-hub's tests/test_fetch.py checks its digest against the same
+# files and the same value, so a digest the hub records is one this package accepts. The digest
+# format is stable (docs: Compatibility and versioning); never change this value in a 3.x release.
+DIGEST_VECTOR_FILES = {
+    "B.txt": b"upper\n",
+    "a.txt": b"lower\n",
+    "dir/x": b"\x00\xff",
+    "dir/sub/y.txt": b"",
+    "dir-y/z": b"z\n",
+}
+DIGEST_VECTOR = "fd6a0842ebb196f5b593281ec33403e9747a65fef2f70bb15246d556e8775bec"
+
+
+def test_digest_matches_the_vector_shared_with_pytemplate_hub(tmp_path: Path) -> None:
+    for name, data in DIGEST_VECTOR_FILES.items():
+        (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / name).write_bytes(data)
+
+    assert pack_digest(tmp_path) == DIGEST_VECTOR
+    assert api.pack_digest(tmp_path) == DIGEST_VECTOR
 
 
 def test_git_pack_records_its_commit_and_digest(pack: Path, tmp_path: Path) -> None:
