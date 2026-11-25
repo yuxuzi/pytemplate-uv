@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- `-h, --hub OWNER/PACK[@TAG]` on `create`, `validate`, `plan`, and the `list-*` and `describe-*`
+  commands (and `hub = "owner/pack@tag"` in a request file): the pack's repository, tag, commit,
+  and digest are read from its pytemplate-hub entry, then checked exactly as the pinned
+  `--template` form is. Without `@TAG`, the newest version that is not yanked is used. The
+  resolved pins are announced on stderr, and `.pytemplate.toml` and `--json` record `hub`.
+- A bare `-h` (with no value) shows the command's help; `--help` is unchanged.
+
+### Changed
+
+- Without `-p`, `create` in a terminal (no `-y`) asks which profile to create, with `python`
+  first, instead of choosing `python` silently. A catalog with one profile uses it without asking;
+  `-y` and `--json` keep the previous choice (`python`, or the error that lists the profiles).
+  `validate` and `plan` never ask.
+
 ## [3.4.0] — 2026-11-25
 
 ### Added

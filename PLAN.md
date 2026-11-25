@@ -38,7 +38,7 @@ want to trust the hub's index.
 
 ## 3. Changes
 
-### U1 `--hub` / `-h`: read the pins from the hub `[ ]`
+### U1 `--hub` / `-h`: read the pins from the hub `[x]`
 
 - `-h, --hub OWNER/PACK[@TAG]` on `create`, `validate`, `plan`, `list-profiles`,
   `describe-profile`, `list-components`, and `describe-component` (the commands that take
@@ -68,7 +68,7 @@ want to trust the hub's index.
   - A malformed `OWNER/PACK`: the expected shape and an example.
 - `create-from-config` accepts `hub = "owner/pack@tag"` in the request file, with the same rules.
 
-### U2 `-h` with no value shows help `[ ]`
+### U2 `-h` with no value shows help `[x]`
 
 `-h` means help almost everywhere, and the decision (D1) is to give it to `--hub` anyway. So that
 the habit still works: `pytemplate create -h` (or `-h` as the last argument, or followed by another
@@ -77,7 +77,7 @@ option) prints the command's help and exits 0, instead of "Option '-h' requires 
 unused, so `pytemplate -h` still says "No such option" and suggests `--help`; the README says
 `-h` is `--hub`.
 
-### U3 Ask for the profile when `-p` is missing `[ ]`
+### U3 Ask for the profile when `-p` is missing `[x]`
 
 `-p` defaults to "not given" instead of `python`.
 
@@ -92,7 +92,7 @@ unused, so `pytemplate -h` still says "No such option" and suggests `--help`; th
 Ctrl-C at the question: "Cancelled; nothing was created.", as the component picker does.
 `validate` and `plan` never ask: they keep the `-y` rule. `questionary` is already a dependency.
 
-### U4 The skill and the docs use the short form `[ ]`
+### U4 The skill and the docs use the short form `[x]`
 
 - Skill step 3: to resolve a chosen pack, use `--hub owner/pack@tag` instead of cloning the hub and
   copying pins. Searching still reads the hub's entries (the clone stays for search only, until the
