@@ -20,6 +20,10 @@ ready-to-deploy project.
 - ✅ **Extensible:** use template packs to customize without forking
 - ✅ **Type-safe:** strict mypy on generated code; requests are validated before anything is written
 
+> **Looking for more templates?** [pytemplate-hub](https://github.com/yuxuzi/pytemplate-hub) is the official place to find template
+> packs for pytemplate-uv: each listing is checked and gives a ready command pinned to the exact
+> files that were checked. New to both? Start with the [tutorial](https://github.com/yuxuzi/pytemplate-hub/blob/main/docs/tutorial.md).
+
 ## What you get
 
 ### Profiles (choose one)
@@ -227,6 +231,35 @@ values:
 
 `pytemplate schema manifest` describes the format.
 
+## Find templates on the hub
+
+The bundled profiles cover common cases. For more, browse [pytemplate-hub](https://github.com/yuxuzi/pytemplate-hub), the official
+index of template packs. The hub stores references, not files: each pack stays in its author's own
+GitHub repository, and each listed version records the tag, commit, and digest that passed the
+hub's checks.
+
+1. Find a pack on the hub and read its repository (a pack's generated project runs code when you
+   use it).
+2. Note the listing's tag, commit, and digest, and pass all three to every command, so you see and
+   render exactly the files the hub checked. A pack that does not match them is refused before
+   anything is read.
+3. See its profiles, then create a project:
+
+```bash
+uvx pytemplate-uv@latest list-profiles \
+  --template gh:yuxuzi/pytemplate-starters --template-ref v1.0.0 \
+  --template-commit 2886e570d1b964811e63b6aa93f3e0ede2e8e7d2 \
+  --template-digest 9257161472cfe280e79c7452ff0e01618b278ea57b7d74280b882976969de924
+
+uvx pytemplate-uv@latest create my-app -p cli \
+  --template gh:yuxuzi/pytemplate-starters --template-ref v1.0.0 \
+  --template-commit 2886e570d1b964811e63b6aa93f3e0ede2e8e7d2 \
+  --template-digest 9257161472cfe280e79c7452ff0e01618b278ea57b7d74280b882976969de924 -y
+```
+
+Made a pack others could use? [List it on the hub](https://github.com/yuxuzi/pytemplate-hub/blob/main/docs/tutorial.md#6-share-your-pack-on-the-hub): you keep
+the repository, and the hub checks each tag you submit.
+
 ## Template packs
 
 A template pack is a directory or git repository with your own profiles and components. It has
@@ -259,8 +292,11 @@ pytemplate create my-tool -p tool --template gh:org/my-pack --template-ref v1.2.
   pytemplate create my-tool -p tool --template gh:org/my-pack --template-ref v1.2.0 \
     --template-commit <commit> --template-digest <digest> -y
   ```
-  `--template-ref` also accepts a full commit hash. A pack pinned to both a commit and a digest is
-  cached under your user cache directory and checked against the digest on every use. Pass
+  `--template-ref` also accepts a full commit hash. The discovery commands (`list-profiles`,
+  `describe-profile`, `list-components`, `describe-component`) accept the same pins. A pack pinned
+  to both a commit and a digest is cached under your user cache directory and checked against the
+  digest on every use; a cached copy is not fetched again, so it always renders the pinned files,
+  and a moved tag is only noticed on the next fetch. Pass
   `--no-cache` (or set `PYTEMPLATE_NO_CACHE=1`) to fetch it again; `PYTEMPLATE_CACHE_DIR` moves
   the cache. Git never prompts for credentials, and a clone stops after 120 seconds
   (`PYTEMPLATE_GIT_TIMEOUT`).
@@ -368,8 +404,15 @@ uv run mypy
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 
+**Sharing a template:** a new kind of project usually belongs in your own template pack rather
+than in the bundled catalog. Publish it in your GitHub repository and [list it on
+pytemplate-hub](https://github.com/yuxuzi/pytemplate-hub/blob/main/docs/tutorial.md#6-share-your-pack-on-the-hub) so others can find it. Contributions to the
+hub itself, from fixes to new checks, are welcome too: see [pytemplate-hub](https://github.com/yuxuzi/pytemplate-hub).
+
 ## Learn more
 
+- [pytemplate-hub](https://github.com/yuxuzi/pytemplate-hub): find and share template packs
+- [Tutorial: from your first project to your own listed pack](https://github.com/yuxuzi/pytemplate-hub/blob/main/docs/tutorial.md)
 - [Compatibility & versioning](docs/compatibility.md)
 - [CHANGELOG](CHANGELOG.md)
 - For AI agents: [AGENTS.md](AGENTS.md)
@@ -385,7 +428,9 @@ review the generated `README.md` (and `.env.example` for FastAPI services).
 
 **What if I want to customize the templates?**
 Use `--template` to point to your own template pack (a directory or git repo). You get all the
-composition logic but with your own code.
+composition logic but with your own code. Before writing one, look on
+[pytemplate-hub](https://github.com/yuxuzi/pytemplate-hub) for a pack that already fits, and once yours works, list it there; the
+[tutorial](https://github.com/yuxuzi/pytemplate-hub/blob/main/docs/tutorial.md) walks through both.
 
 **How do I keep my project updated?**
 The generated project is yours from the first commit; pytemplate does not merge later template

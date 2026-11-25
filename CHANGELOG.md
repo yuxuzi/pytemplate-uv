@@ -6,6 +6,34 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## [3.3.0] — 2026-11-24
+
+3.3.0 connects pytemplate-uv to pytemplate-hub, the index of template packs: the skill can find a
+pack there, and the README shows where to find and share packs.
+
+### Added
+
+- The `pytemplate` skill can look for a template pack on
+  [pytemplate-hub](https://github.com/yuxuzi/pytemplate-hub) when the user asks for one or no
+  bundled profile fits. It shows the candidates and whether each is listed or reviewed, waits for
+  the user's choice, and pins the request to the listed commit and digest. Reinstall the skill with
+  `pytemplate skill install --force`.
+- `list-profiles`, `describe-profile`, `list-components`, and `describe-component` accept
+  `--template-commit`, `--template-digest`, and `--no-cache`, so you can inspect exactly the
+  pack revision you will render.
+
+### Fixed
+
+- The docs no longer claim that a cached pinned pack is refused when its tag moves. A cache hit is
+  checked against the digest but not fetched again, so it renders the pinned files and notices a
+  moved tag only on the next fetch (`--no-cache`).
+
+### Documentation
+
+- The README names [pytemplate-hub](https://github.com/yuxuzi/pytemplate-hub) as the place to
+  find and share template packs, shows a pinned command from a listing, and links the hub's
+  tutorial.
+
 ## [3.2.0] — 2026-11-17
 
 3.2.0 makes the CLI friendlier and faster, adds a `library` profile with `release` and

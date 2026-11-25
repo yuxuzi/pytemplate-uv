@@ -27,8 +27,11 @@ from pytemplate.cli_options import (
     ForceOption,
     JsonOption,
     NameOption,
+    NoCacheOption,
     NoInputOption,
     RequestOptions,
+    TemplateCommitOption,
+    TemplateDigestOption,
     TemplateOption,
     TemplateRefOption,
     YesOption,
@@ -294,10 +297,20 @@ create_project_app.command()(create)
 
 
 @contextlib.contextmanager
-def _catalog(template: str | None, template_ref: str | None, as_json: bool) -> Iterator[Catalog]:
+def _catalog(
+    template: str | None,
+    template_ref: str | None,
+    as_json: bool,
+    *,
+    commit: str | None = None,
+    digest: str | None = None,
+    no_cache: bool = False,
+) -> Iterator[Catalog]:
     """Open the bundled catalog or a pack, reporting pack errors with the CLI exit codes."""
     try:
-        with open_catalog(template, template_ref) as (catalog, _, _):
+        with open_catalog(
+            template, template_ref, commit=commit, digest=digest, use_cache=not no_cache
+        ) as (catalog, _, _):
             yield catalog
     except (*_REQUEST_ERRORS, RenderError) as error:
         _fail(error, as_json)
@@ -307,10 +320,20 @@ def _catalog(template: str | None, template_ref: str | None, as_json: bool) -> I
 def list_profiles_command(
     template: TemplateOption = None,
     template_ref: TemplateRefOption = None,
+    template_commit: TemplateCommitOption = None,
+    template_digest: TemplateDigestOption = None,
+    no_cache: NoCacheOption = False,
     as_json: JsonOption = False,
 ) -> None:
     """List the profiles of the bundled catalog or a template pack."""
-    with _catalog(template, template_ref, as_json) as catalog:
+    with _catalog(
+        template,
+        template_ref,
+        as_json,
+        commit=template_commit,
+        digest=template_digest,
+        no_cache=no_cache,
+    ) as catalog:
         profiles = catalog.profiles
     if as_json:
         _echo_json([_profile_dict(profile) for profile in profiles])
@@ -341,10 +364,20 @@ def describe_profile(
     profile_id: Annotated[str, typer.Argument(help="Profile identifier")],
     template: TemplateOption = None,
     template_ref: TemplateRefOption = None,
+    template_commit: TemplateCommitOption = None,
+    template_digest: TemplateDigestOption = None,
+    no_cache: NoCacheOption = False,
     as_json: JsonOption = False,
 ) -> None:
     """Show metadata and template inputs for a profile."""
-    with _catalog(template, template_ref, as_json) as catalog:
+    with _catalog(
+        template,
+        template_ref,
+        as_json,
+        commit=template_commit,
+        digest=template_digest,
+        no_cache=no_cache,
+    ) as catalog:
         try:
             profile = catalog.profile(profile_id)
         except ProfileNotFoundError as error:
@@ -375,10 +408,20 @@ def describe_profile(
 def list_components_command(
     template: TemplateOption = None,
     template_ref: TemplateRefOption = None,
+    template_commit: TemplateCommitOption = None,
+    template_digest: TemplateDigestOption = None,
+    no_cache: NoCacheOption = False,
     as_json: JsonOption = False,
 ) -> None:
     """List the components of the bundled catalog or a template pack."""
-    with _catalog(template, template_ref, as_json) as catalog:
+    with _catalog(
+        template,
+        template_ref,
+        as_json,
+        commit=template_commit,
+        digest=template_digest,
+        no_cache=no_cache,
+    ) as catalog:
         components = catalog.components
     if as_json:
         _echo_json([_component_dict(component) for component in components])
@@ -407,10 +450,20 @@ def describe_component(
     component_id: Annotated[str, typer.Argument(help="Component identifier")],
     template: TemplateOption = None,
     template_ref: TemplateRefOption = None,
+    template_commit: TemplateCommitOption = None,
+    template_digest: TemplateDigestOption = None,
+    no_cache: NoCacheOption = False,
     as_json: JsonOption = False,
 ) -> None:
     """Show metadata for a component."""
-    with _catalog(template, template_ref, as_json) as catalog:
+    with _catalog(
+        template,
+        template_ref,
+        as_json,
+        commit=template_commit,
+        digest=template_digest,
+        no_cache=no_cache,
+    ) as catalog:
         try:
             component = catalog.component(component_id)
         except ComponentNotFoundError as error:
