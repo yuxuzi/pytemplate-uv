@@ -25,6 +25,7 @@ _GROUPS: dict[str, Any] = {"type": "object", "additionalProperties": _NAMES}
 _CONTRACT: dict[str, Any] = {"const": CONTRACT_VERSION}
 _IDENTIFIER: dict[str, Any] = {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"}
 _CATEGORY: dict[str, Any] = {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"}
+# The loader also refuses non-ASCII uppercase letters, which this ASCII pattern cannot express.
 _KEYWORD: dict[str, Any] = {
     "type": "string",
     "minLength": 1,
