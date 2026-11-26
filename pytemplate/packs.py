@@ -181,6 +181,16 @@ def _clone(location: str, ref: str | None, destination: Path) -> str:
     commit = _run_git(git, ["rev-parse", "HEAD"], location=location, cwd=destination)
     if commit.returncode != 0:
         raise PackError(f"Could not read the commit of '{location}': {commit.stderr.strip()}")
+    # A submodule (a gitlink, mode 160000) is never fetched, so the digest would silently omit it.
+    listing = _run_git(git, ["ls-tree", "-r", "-z", "HEAD"], location=location, cwd=destination)
+    if listing.returncode != 0:
+        raise PackError(f"Could not list the files of '{location}': {listing.stderr.strip()}")
+    for entry in listing.stdout.split("\0"):
+        mode, _, name = entry.partition("\t")
+        if mode.split(" ", 1)[0] == "160000":
+            raise PackError(
+                f"Template pack '{location}' contains a git submodule, which is not allowed: {name}"
+            )
     # Render from a plain checkout; the source, ref, and commit are recorded separately.
     _remove_tree(destination / ".git")
     return commit.stdout.strip()

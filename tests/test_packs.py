@@ -713,3 +713,20 @@ def test_crlf_settings_do_not_change_a_pack_checked_out_on_windows(
 
     assert b"\r\n" not in (dest / "a.txt").read_bytes()
     assert (dest / "a.txt").read_bytes() == b"one\ntwo\n"
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is required")
+def test_a_pack_with_a_git_submodule_is_refused(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    (repo / "a.txt").write_text("one\n", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "pack")
+    existing = _git(repo, "rev-parse", "HEAD")
+    # A gitlink (mode 160000) records a commit in another repository, which git never fetches.
+    _git(repo, "update-index", "--add", "--cacheinfo", f"160000,{existing},sub")
+    _git(repo, "commit", "-q", "-m", "add a submodule")
+
+    with pytest.raises(PackError, match="submodule"):
+        packs._clone(str(repo), None, tmp_path / "dest")
