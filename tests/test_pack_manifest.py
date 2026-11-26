@@ -18,12 +18,12 @@ def _with_keys(root: Path, extra: str) -> Path:
 def test_valid_categories_and_keywords_load(tmp_path: Path) -> None:
     root = _with_keys(
         write_pack(tmp_path / "pack"),
-        'categories = ["data", "risk-tools"]\nkeywords = ["backtest", "factor"]\n',
+        'categories = ["data", "quant"]\nkeywords = ["backtest", "factor"]\n',
     )
 
     manifest = read_pack_manifest(root)
 
-    assert manifest.categories == ("data", "risk-tools")
+    assert manifest.categories == ("data", "quant")
     assert manifest.keywords == ("backtest", "factor")
     assert manifest.id == "demo-pack"
     assert manifest.name == "Demo pack"
@@ -63,11 +63,15 @@ def test_pack_with_the_keys_still_opens_as_a_catalog(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("extra", "message"),
     [
-        ('categories = "data"', r"'categories' must be a list of lowercase slugs, got 'data'"),
-        ("categories = [3]", r"'categories' must be a list of lowercase slugs, got \[3\]"),
-        ('categories = ["Data"]', r"category 'Data' must be a lowercase slug"),
-        ('categories = ["risk tools"]', r"category 'risk tools' must be a lowercase slug"),
-        ('categories = ["9lives"]', r"category '9lives' must be a lowercase slug"),
+        (
+            'categories = "data"',
+            r"'categories' must be a list of category ids \(cli, .*\), got 'data'",
+        ),
+        ("categories = [3]", r"'categories' must be a list of category ids \(cli, .*\), got \[3\]"),
+        ('categories = ["Data"]', r"unknown category 'Data'; use one of: cli, library, web"),
+        ('categories = ["risk-tools"]', r"unknown category 'risk-tools'; use one of"),
+        ('categories = ["webs"]', r"unknown category 'webs'.* Did you mean 'web'\?"),
+        ('categories = ["web", "web"]', r"each category may be listed only once"),
         ('keywords = "factor"', r"'keywords' must be a list of strings, got 'factor'"),
         ("keywords = [1]", r"'keywords' must be a list of strings, got \[1\]"),
         (
@@ -88,3 +92,12 @@ def test_invalid_shapes_name_the_file_and_key(tmp_path: Path, extra: str, messag
 
     with pytest.raises(PackError, match=PACK_FILE + ": " + message):
         read_pack_manifest(root)
+
+
+def test_the_category_list_is_fixed_and_exported() -> None:
+    from pytemplate import api
+    from pytemplate.schema import SCHEMAS
+
+    assert api.PACK_CATEGORIES == ("cli", "library", "web", "worker", "data", "ai", "quant")
+    items = SCHEMAS["pack"]["properties"]["categories"]["items"]
+    assert items == {"enum": list(api.PACK_CATEGORIES)}

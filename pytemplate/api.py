@@ -9,8 +9,9 @@ releases::
     planned = api.plan(request)     # resolution and file list; writes nothing
     result = api.render(request)    # renders and publishes the project
 
-``pack_digest(root)`` returns a pack's digest, the value ``--template-digest`` pins; tools that
-record digests, such as pytemplate-hub, should call it rather than compute their own.
+``PACK_CATEGORIES`` is the fixed list a pack's ``categories`` may use. ``pack_digest(root)``
+returns a pack's digest, the value ``--template-digest`` pins. Tools that record categories or
+digests, such as pytemplate-hub, should use these rather than keep their own copies.
 
 Errors: catch `RequestError` for an invalid request (nothing was written); it covers
 `ConfigurationError`, `ManifestError`, `PackError`, and the profile and component errors, which are
@@ -23,6 +24,7 @@ from pytemplate.configuration import ConfigurationError
 from pytemplate.configuration import load_render_request as load_request
 from pytemplate.errors import PackError, RenderError, RequestError
 from pytemplate.packs import (
+    PACK_CATEGORIES,
     PackManifest,
     TemplateSource,
     open_catalog,
@@ -46,6 +48,7 @@ from pytemplate.resolution import Resolution, resolve
 from pytemplate.schema import SCHEMAS
 
 __all__ = [
+    "PACK_CATEGORIES",
     "SCHEMAS",
     "Catalog",
     "Component",
