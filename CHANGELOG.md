@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## [3.7.1] — 2026-11-25
+
+3.7.1 makes a pack's digest the same on every operating system and refuses submodules.
+
 ### Fixed
 
 - A git template pack is checked out with LF line endings on every machine, even when its
