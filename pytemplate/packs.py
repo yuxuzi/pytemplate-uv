@@ -214,7 +214,8 @@ def pack_digest(root: Path) -> str:
 
     Files are hashed in order of their path components, compared as case-sensitive strings, so the
     result is the same on every operating system. Each path (with forward slashes) and each file's
-    bytes are followed by a NUL byte. ``root`` must not contain ``.git``.
+    bytes are followed by a NUL byte. ``root`` must not contain ``.git``. File modes (such as the
+    executable bit) and empty directories are not part of the digest.
     """
     digest = hashlib.sha256()
     for path in sorted(root.rglob("*"), key=lambda item: item.relative_to(root).parts):
