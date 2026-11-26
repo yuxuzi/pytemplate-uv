@@ -26,6 +26,7 @@ from pytemplate.profiles import (
     bundled_catalog,
     load_catalog,
 )
+from pytemplate.suggestions import did_you_mean
 
 PACK_FILE = "pytemplate-pack.toml"
 BUNDLED = "bundled"
@@ -37,7 +38,9 @@ _PACK_KEYS = frozenset(
 )
 MAX_KEYWORDS = 12
 MAX_KEYWORD_LENGTH = 30
-_CATEGORY = re.compile(r"[a-z][a-z0-9-]*")
+# The fixed category vocabulary that pytemplate-hub files packs under. A new category is added in
+# a pytemplate-uv release, so every pack, check, and listing agrees on the same list.
+PACK_CATEGORIES: tuple[str, ...] = ("cli", "library", "web", "worker", "data", "ai", "quant")
 _COMMIT = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 
@@ -46,8 +49,8 @@ _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 class PackManifest:
     """The contents of a pack's ``pytemplate-pack.toml``.
 
-    ``categories`` and ``keywords`` are optional and only checked for shape; the template hub
-    owns their vocabulary.
+    ``categories`` and ``keywords`` are optional. Each category must be one of
+    ``PACK_CATEGORIES``; keywords are free search words, checked for shape only.
     """
 
     id: str
@@ -310,16 +313,19 @@ def _check_safe(root: Path) -> None:
 
 def _categories(data: dict[str, Any]) -> tuple[str, ...]:
     value = data.get("categories", [])
+    allowed = ", ".join(PACK_CATEGORIES)
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         raise PackError(
-            f"{PACK_FILE}: 'categories' must be a list of lowercase slugs, got {value!r}."
+            f"{PACK_FILE}: 'categories' must be a list of category ids ({allowed}), got {value!r}."
         )
     for item in value:
-        if not _CATEGORY.fullmatch(item):
+        if item not in PACK_CATEGORIES:
             raise PackError(
-                f"{PACK_FILE}: category {item!r} must be a lowercase slug: letters, digits, and "
-                "hyphens, starting with a letter."
+                f"{PACK_FILE}: unknown category {item!r}; use one of: {allowed}."
+                + did_you_mean(item, PACK_CATEGORIES)
             )
+    if len(set(value)) != len(value):
+        raise PackError(f"{PACK_FILE}: each category may be listed only once, got {value!r}.")
     return tuple(value)
 
 

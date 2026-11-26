@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## [3.7.0] — 2026-11-25
+
+3.7.0 fixes the list of categories a pack may declare.
+
+### Changed
+
+- A pack's `categories` must come from a fixed list: `cli`, `library`, `web`, `worker`, `data`, `ai`,
+  and `quant`, the categories pytemplate-hub files packs under. An unknown or repeated category is
+  refused with the list and a "did you mean" hint, so an author learns it while writing the pack,
+  not when listing it. The `pack` JSON Schema gives the list as an enum. New categories arrive in
+  later releases. `categories` stays optional; `keywords` stay free search words.
+
+### Added
+
+- `pytemplate.api.PACK_CATEGORIES`, the fixed list, so tools such as pytemplate-hub use the same one.
+
 ## [3.6.0] — 2026-11-25
 
 3.6.0 moves the documentation to the pytemplate website and exports the pack digest.

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from pytemplate.packs import PACK_CATEGORIES
 from pytemplate.profiles import (
     COMPONENT_STATUSES,
     CONTRACT_VERSION,
@@ -24,7 +25,7 @@ _NAMES: dict[str, Any] = {"type": "array", "items": _TEXT, "uniqueItems": True}
 _GROUPS: dict[str, Any] = {"type": "object", "additionalProperties": _NAMES}
 _CONTRACT: dict[str, Any] = {"const": CONTRACT_VERSION}
 _IDENTIFIER: dict[str, Any] = {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"}
-_CATEGORY: dict[str, Any] = {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"}
+_CATEGORY: dict[str, Any] = {"enum": list(PACK_CATEGORIES)}
 # The loader also refuses non-ASCII uppercase letters, which this ASCII pattern cannot express.
 _KEYWORD: dict[str, Any] = {
     "type": "string",
@@ -134,7 +135,7 @@ PACK = _document(
             "name": _TEXT,
             "description": _TEXT,
             "version": _TEXT,
-            "categories": {"type": "array", "items": _CATEGORY},
+            "categories": {"type": "array", "items": _CATEGORY, "uniqueItems": True},
             "keywords": {"type": "array", "maxItems": 12, "items": _KEYWORD},
         },
         ["contract", "id", "name", "description", "version"],
