@@ -122,7 +122,7 @@ def _run_git(
     timeout = _git_timeout()
     try:
         return subprocess.run(
-            [git, "-c", "core.autocrlf=false", *args],
+            [git, "-c", "core.autocrlf=false", "-c", "core.eol=lf", *args],
             cwd=cwd,
             capture_output=True,
             text=True,
@@ -156,8 +156,9 @@ def _fetch_commit(git: str, url: str, commit: str, destination: Path, location: 
 def _clone(location: str, ref: str | None, destination: Path) -> str:
     """Clone ``location`` at ``ref`` into a plain checkout and return its commit.
 
-    ``ref`` is a branch, a tag, or a full commit hash. Line endings are not converted, so a pack
-    has the same bytes and digest on every machine.
+    ``ref`` is a branch, a tag, or a full commit hash. Line endings are not converted, even when
+    the pack's ``.gitattributes`` sets ``text=auto`` and the machine's git config asks for CRLF
+    (as Windows does), so a pack has the same bytes and digest on every machine.
     """
     git = shutil.which("git")
     if git is None:
