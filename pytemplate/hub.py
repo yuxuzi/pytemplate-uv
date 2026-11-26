@@ -27,6 +27,7 @@ _SPEC = re.compile(
 _REPOSITORY = re.compile(r"^https://github\.com/([A-Za-z0-9-]+)/([A-Za-z0-9._-]+)$")
 _COMMIT = re.compile(r"^[0-9a-f]{40}$")
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
+_MAX_ENTRY_BYTES = 1024 * 1024
 
 
 class HubError(RequestError):
@@ -82,14 +83,20 @@ def parse_spec(spec: str) -> tuple[str, str, str | None]:
 
 
 def _read_entry(url: str, pack: str) -> bytes:
-    """Fetch one hub entry; a 404 (or a missing file URL) means the pack is not listed."""
+    """Fetch one hub entry of at most 1 MiB; a 404 (or a missing file URL) means not listed."""
     not_listed = HubError(
         f"'{pack}' is not listed on pytemplate-hub. Browse the listed packs at {HUB_SITE}, or "
         "pass --template for a pack that is not listed."
     )
     try:
         with urllib.request.urlopen(url, timeout=_git_timeout()) as response:
-            return bytes(response.read())
+            data = bytes(response.read(_MAX_ENTRY_BYTES + 1))
+        if len(data) > _MAX_ENTRY_BYTES:
+            raise HubError(
+                f"The pytemplate-hub entry for '{pack}' is larger than 1 MiB. Pass the full "
+                "--template pins instead."
+            )
+        return data
     except urllib.error.HTTPError as error:
         if error.code == 404:
             raise not_listed from error

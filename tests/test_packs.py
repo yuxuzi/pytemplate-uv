@@ -689,3 +689,44 @@ def test_cache_dir_can_be_overridden(tmp_path: Path, monkeypatch: pytest.MonkeyP
     monkeypatch.setenv("PYTEMPLATE_CACHE_DIR", str(tmp_path / "mine"))
 
     assert packs.cache_dir() == tmp_path / "mine"
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is required")
+def test_crlf_settings_do_not_change_a_pack_checked_out_on_windows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    (repo / "a.txt").write_bytes(b"one\ntwo\n")
+    (repo / ".gitattributes").write_text("* text=auto\n", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "pack")
+    # Simulate a Windows user's global git config: CRLF checkouts, native line endings.
+    global_config = tmp_path / "gitconfig"
+    global_config.write_text("[core]\n\teol = crlf\n\tautocrlf = true\n", encoding="utf-8")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(global_config))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    dest = tmp_path / "dest"
+
+    packs._clone(str(repo), None, dest)
+
+    assert b"\r\n" not in (dest / "a.txt").read_bytes()
+    assert (dest / "a.txt").read_bytes() == b"one\ntwo\n"
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is required")
+def test_a_pack_with_a_git_submodule_is_refused(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    (repo / "a.txt").write_text("one\n", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "pack")
+    existing = _git(repo, "rev-parse", "HEAD")
+    # A gitlink (mode 160000) records a commit in another repository, which git never fetches.
+    _git(repo, "update-index", "--add", "--cacheinfo", f"160000,{existing},sub")
+    _git(repo, "commit", "-q", "-m", "add a submodule")
+
+    with pytest.raises(PackError, match="submodule"):
+        packs._clone(str(repo), None, tmp_path / "dest")

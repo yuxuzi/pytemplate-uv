@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Fixed
+
+- A git template pack is checked out with LF line endings on every machine, even when its
+  `.gitattributes` sets `text=auto` and the machine's git config asks for CRLF (as on Windows). Its
+  digest is therefore the same everywhere, and a pinned create is no longer refused on Windows.
+- A git template pack that contains a submodule is refused with a `PackError`. A submodule is not
+  fetched, so the digest would have left it out without a word.
+- A pytemplate-hub entry is read up to 1 MiB; a larger one is refused with a message that suggests
+  the full `--template` pins.
+
 ## [3.7.0] — 2026-11-25
 
 3.7.0 fixes the list of categories a pack may declare.

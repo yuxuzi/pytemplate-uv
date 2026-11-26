@@ -122,7 +122,7 @@ def _run_git(
     timeout = _git_timeout()
     try:
         return subprocess.run(
-            [git, "-c", "core.autocrlf=false", *args],
+            [git, "-c", "core.autocrlf=false", "-c", "core.eol=lf", *args],
             cwd=cwd,
             capture_output=True,
             text=True,
@@ -156,8 +156,9 @@ def _fetch_commit(git: str, url: str, commit: str, destination: Path, location: 
 def _clone(location: str, ref: str | None, destination: Path) -> str:
     """Clone ``location`` at ``ref`` into a plain checkout and return its commit.
 
-    ``ref`` is a branch, a tag, or a full commit hash. Line endings are not converted, so a pack
-    has the same bytes and digest on every machine.
+    ``ref`` is a branch, a tag, or a full commit hash. Line endings are not converted, even when
+    the pack's ``.gitattributes`` sets ``text=auto`` and the machine's git config asks for CRLF
+    (as Windows does), so a pack has the same bytes and digest on every machine.
     """
     git = shutil.which("git")
     if git is None:
@@ -180,6 +181,16 @@ def _clone(location: str, ref: str | None, destination: Path) -> str:
     commit = _run_git(git, ["rev-parse", "HEAD"], location=location, cwd=destination)
     if commit.returncode != 0:
         raise PackError(f"Could not read the commit of '{location}': {commit.stderr.strip()}")
+    # A submodule (a gitlink, mode 160000) is never fetched, so the digest would silently omit it.
+    listing = _run_git(git, ["ls-tree", "-r", "-z", "HEAD"], location=location, cwd=destination)
+    if listing.returncode != 0:
+        raise PackError(f"Could not list the files of '{location}': {listing.stderr.strip()}")
+    for entry in listing.stdout.split("\0"):
+        mode, _, name = entry.partition("\t")
+        if mode.split(" ", 1)[0] == "160000":
+            raise PackError(
+                f"Template pack '{location}' contains a git submodule, which is not allowed: {name}"
+            )
     # Render from a plain checkout; the source, ref, and commit are recorded separately.
     _remove_tree(destination / ".git")
     return commit.stdout.strip()
@@ -203,7 +214,8 @@ def pack_digest(root: Path) -> str:
 
     Files are hashed in order of their path components, compared as case-sensitive strings, so the
     result is the same on every operating system. Each path (with forward slashes) and each file's
-    bytes are followed by a NUL byte. ``root`` must not contain ``.git``.
+    bytes are followed by a NUL byte. ``root`` must not contain ``.git``. File modes (such as the
+    executable bit) and empty directories are not part of the digest.
     """
     digest = hashlib.sha256()
     for path in sorted(root.rglob("*"), key=lambda item: item.relative_to(root).parts):
