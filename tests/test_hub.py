@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from cli_runner import make_runner
 
-from pytemplate import packs
+from pytemplate import hub, packs
 from pytemplate.main import app
 
 runner = make_runner()
@@ -307,3 +307,36 @@ def _index_path() -> Path:
     from urllib.request import url2pathname
 
     return Path(url2pathname(urlparse(os.environ["PYTEMPLATE_HUB_URL"]).path))
+
+
+class _FakeResponse:
+    """Stand-in for an HTTP response that serves at most the bytes asked for."""
+
+    def __init__(self, payload: bytes) -> None:
+        self._payload = payload
+
+    def __enter__(self) -> "_FakeResponse":
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        return None
+
+    def read(self, size: int = -1) -> bytes:
+        return self._payload if size < 0 else self._payload[:size]
+
+
+def test_a_hub_entry_over_one_mib_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    limit = 1024 * 1024
+    monkeypatch.setattr(
+        hub.urllib.request, "urlopen", lambda *_, **__: _FakeResponse(b"x" * (limit + 1))
+    )
+
+    with pytest.raises(hub.HubError, match="larger than 1 MiB.*--template pins"):
+        hub._read_entry("https://hub.invalid/yuxuzi/demo-pack.toml", PACK)
+
+
+def test_a_hub_entry_of_exactly_one_mib_is_read(monkeypatch: pytest.MonkeyPatch) -> None:
+    limit = 1024 * 1024
+    monkeypatch.setattr(hub.urllib.request, "urlopen", lambda *_, **__: _FakeResponse(b"x" * limit))
+
+    assert hub._read_entry("https://hub.invalid/yuxuzi/demo-pack.toml", PACK) == b"x" * limit
