@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+### Fixed
+
+- `pytemplate skill install --force` refuses a `SKILL.md`, or a skill directory, that is a
+  symbolic link instead of writing through it to a file outside the skills directory, and
+  replaces the file atomically.
+
 ## [3.7.1] — 2026-11-25
 
 3.7.1 makes a pack's digest the same on every operating system and refuses submodules.

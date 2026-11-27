@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import tempfile
 from importlib import resources
 from pathlib import Path
 
@@ -41,13 +43,37 @@ def default_skills_dir(*, project: bool, agent: str = "claude") -> Path:
 
 
 def install_skill(skills_dir: Path, *, force: bool = False) -> Path:
-    """Write SKILL.md to ``skills_dir/pytemplate/SKILL.md`` and return its path."""
-    target = skills_dir.expanduser() / SKILL_NAME / "SKILL.md"
+    """Write SKILL.md to ``skills_dir/pytemplate/SKILL.md`` and return its path.
+
+    The skill's own directory and file must not be symbolic links, so ``--force`` never writes
+    through a link to a file outside ``skills_dir``. The file is replaced atomically.
+    """
+    skill_dir = skills_dir.expanduser() / SKILL_NAME
+    target = skill_dir / "SKILL.md"
+    for path in (skill_dir, target):
+        if path.is_symlink():
+            raise SkillInstallError(
+                f"{path} is a symbolic link; remove it and install the skill again."
+            )
     if target.exists() and not force:
         raise SkillInstallError(f"{target} already exists; pass --force to replace it.")
     try:
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(skill_text(), encoding="utf-8")
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        _replace_file(target, skill_text())
     except OSError as error:
         raise SkillInstallError(f"Could not write {target}: {error}") from error
     return target
+
+
+def _replace_file(target: Path, text: str) -> None:
+    """Write ``text`` to a temporary file beside ``target`` and move it into place."""
+    descriptor, staged = tempfile.mkstemp(dir=target.parent, prefix=f".{target.name}.")
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        # mkstemp creates the file readable only by its owner; a skill file is not private.
+        os.chmod(staged, 0o644)
+        os.replace(staged, target)
+    except BaseException:
+        Path(staged).unlink(missing_ok=True)
+        raise
