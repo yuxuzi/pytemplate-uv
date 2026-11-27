@@ -43,6 +43,49 @@ def test_skill_install_writes_and_refuses_to_overwrite(tmp_path: Path) -> None:
     assert forced.exit_code == 0, forced.output
 
 
+def _symlink(link: Path, target: Path, *, directory: bool = False) -> None:
+    try:
+        link.symlink_to(target, target_is_directory=directory)
+    except OSError as error:  # Windows without the symlink privilege
+        pytest.skip(f"cannot create symlinks: {error}")
+
+
+def test_forced_install_refuses_a_symlinked_skill_file(tmp_path: Path) -> None:
+    outside = tmp_path / "outside.txt"
+    outside.write_text("keep me", encoding="utf-8")
+    skills = tmp_path / "skills"
+    (skills / "pytemplate").mkdir(parents=True)
+    _symlink(skills / "pytemplate" / "SKILL.md", outside)
+
+    result = runner.invoke(app, ["skill", "install", "--dest", str(skills), "--force"])
+
+    assert result.exit_code == 1
+    assert "symbolic link" in result.output
+    assert outside.read_text(encoding="utf-8") == "keep me"
+
+
+def test_forced_install_refuses_a_symlinked_skill_directory(tmp_path: Path) -> None:
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "SKILL.md").write_text("keep me", encoding="utf-8")
+    skills = tmp_path / "skills"
+    skills.mkdir()
+    _symlink(skills / "pytemplate", outside, directory=True)
+
+    result = runner.invoke(app, ["skill", "install", "--dest", str(skills), "--force"])
+
+    assert result.exit_code == 1
+    assert "symbolic link" in result.output
+    assert (outside / "SKILL.md").read_text(encoding="utf-8") == "keep me"
+
+
+def test_forced_install_leaves_no_temporary_file(tmp_path: Path) -> None:
+    runner.invoke(app, ["skill", "install", "--dest", str(tmp_path)])
+    runner.invoke(app, ["skill", "install", "--dest", str(tmp_path), "--force"])
+
+    assert [path.name for path in (tmp_path / "pytemplate").iterdir()] == ["SKILL.md"]
+
+
 def test_skill_install_targets_the_chosen_agent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
